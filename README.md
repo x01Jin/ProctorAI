@@ -13,22 +13,21 @@ This project requires several Python packages to function correctly. A `requirem
 ### Installation Instructions
 
 1. **Clone the Repository**
-   ```bash
-   git clone <repository_url>
-   cd ProctorAI
-   ```
+    ```bash
+    git clone https://github.com/x01Jin/ProctorAI
+    cd ProctorAI
+    ```
 2. **Set Up a Virtual Environment (Optional but Recommended)**
-  Using venv:
-  ```bash
-  python -m venv .venv
-  # On Windows use:
-  venv\Scripts\activate
-  ```
+    Using venv:
+    ```bash
+    python -m venv .venv
+    # On Windows use:
+    venv\Scripts\activate
+    ```
 3. **Install Required Packages Use the following command to install all required packages listed in requirements.txt:**
-
-  ```bash
-  pip install -r requirements.txt
-  ```
+    ```bash
+    pip install -r requirements.txt
+    ```
 ### Usage Instructions
 
 1. **Run the Application**

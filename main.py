@@ -10,7 +10,6 @@ import os
 from fpdf import FPDF
 from datetime import datetime
 
-# Initialize Roboflow
 def initialize_roboflow():
     rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
     project = rf.workspace().project("giam_sat_gian_lan")
@@ -18,67 +17,54 @@ def initialize_roboflow():
 
 model = initialize_roboflow()
 
-# Initialize main window
 root = tk.Tk()
 root.title("ProctorAI")
 
-# Dark mode settings
 dark_bg = "#2b2b2b"
 dark_fg = "#e0e0e0"
 accent_color = "#007acc"
 root.configure(bg=dark_bg)
 
-# Create folder for temporary captures
 if not os.path.exists("tempcaptures"):
     os.makedirs("tempcaptures")
 
-# Frame to organize layout
 frame = tk.Frame(root, bg=dark_bg)
 frame.pack(fill=tk.BOTH, expand=True)
 
-# Configure grid weights for responsiveness
 for i in range(5):
     frame.grid_columnconfigure(i, weight=1)
 frame.grid_rowconfigure(0, weight=1)
 
-# Canvas to display image
 canvas = tk.Canvas(frame, width=800, height=600, bg=dark_bg, highlightthickness=0)
 canvas.grid(row=0, column=0, columnspan=4, sticky="nsew")
 
-# Label to display number of detected objects
 label = tk.Label(frame, text="Detected Objects: 0", bg=dark_bg, fg=dark_fg)
 label.grid(row=1, column=0, columnspan=4, sticky="ew")
 
-# Slider for confidence threshold
 confidence_slider = tk.Scale(frame, from_=1, to=100, orient=tk.HORIZONTAL, label="Confidence Threshold", bg=dark_bg, fg=dark_fg, highlightthickness=0)
-confidence_slider.set(40)  # Default value
+confidence_slider.set(40)
 confidence_slider.grid(row=2, column=0, columnspan=4, sticky="ew")
 
-# Dropdown for display mode
 display_mode = tk.StringVar()
-display_mode.set("draw_labels")  # Default value
+display_mode.set("draw_labels")
 display_mode_menu = ttk.Combobox(frame, textvariable=display_mode, values=("draw_labels", "draw_confidence"))
 display_mode_menu.grid(row=3, column=0, columnspan=2, sticky="ew")
 
-# Dropdown for label filter ("cheating", "not_cheating")
 label_filter = tk.StringVar()
-label_filter.set("cheating")  # Default value
+label_filter.set("cheating")
 label_filter_menu = ttk.Combobox(frame, textvariable=label_filter, values=("cheating", "not_cheating"))
 label_filter_menu.grid(row=3, column=2, columnspan=2, sticky="ew")
 
-# Text widget to display predictions
 predictions_text = ScrolledText(frame, width=50, height=10, bg=dark_bg, fg=dark_fg)
 predictions_text.grid(row=4, column=0, columnspan=2, sticky="nsew")
 
-# History widget to show captured cheating images
 history_text = ScrolledText(frame, width=50, height=10, bg=dark_bg, fg=dark_fg)
 history_text.grid(row=4, column=2, columnspan=2, sticky="nsew")
 
-# Global variables
 current_image = None
 cap = None
 detections = []
-detection_active = False  # Track if detection is active
+detection_active = False
 
 def use_camera():
     """Start the camera feed."""
@@ -94,7 +80,7 @@ def update_camera():
             global current_image
             current_image = frame
             display_frame(frame)
-        time.sleep(1 / 30)  # 30 FPS
+        time.sleep(1 / 30)
 
 def display_frame(frame):
     """Draw bounding boxes and labels on the frame and display it on the canvas."""
@@ -102,7 +88,7 @@ def display_frame(frame):
     image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
     for detection in detections:
-        if detection['class'] == label_filter.get():  # Apply label filter
+        if detection['class'] == label_filter.get():
             draw_bounding_box(image_rgb, detection)
 
     update_canvas(image_rgb)
@@ -118,7 +104,6 @@ def draw_bounding_box(image, detection):
     confidence = detection['confidence']
     color = (0, 255, 0) if class_name == "not_cheating" else (255, 0, 0)
 
-    # Draw bounding box and label/confidence
     cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
     label_text = class_name if display_mode.get() == "draw_labels" else f"{confidence:.2f}%"
     put_text(image, label_text, x0, y0, color)
@@ -199,12 +184,10 @@ def capture_cheating_image(detection):
     image_filename = f"tempcaptures/cheating_{timestamp}.jpg"
     cv2.imwrite(image_filename, cheating_image)
 
-    # Add to history text widget
     history_text.insert(tk.END, f"Cheating detected at {timestamp}. Saved to {image_filename}\n")
 
 def save_pdf():
     """Generate a PDF file with the cheating images."""
-    # Open file dialog to select save location
     pdf_filename = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
     if not pdf_filename:
         return
@@ -212,7 +195,6 @@ def save_pdf():
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    # Add header page
     pdf.add_page()
     pdf.set_font("Arial", size=20)
     page_height = pdf.h
@@ -222,14 +204,12 @@ def save_pdf():
     pdf.cell(200, 10, txt="Generated Report", ln=True, align="C")
     pdf.ln(10)
     
-    # Add current date and time to the header page
     current_datetime = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H:%M:%S")
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt=f"Date: {current_datetime}", ln=True, align="C")
     pdf.cell(200, 10, txt=f"Time: {current_time}", ln=True, align="C")
     
-    # Add a new page for images
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     
@@ -237,7 +217,7 @@ def save_pdf():
         if filename.endswith(".jpg"):
             image_path = os.path.join("tempcaptures", filename)
             pdf.cell(200, 10, txt=filename, ln=True)
-            pdf.image(image_path, x=10, y=None, w=80)  # Adjusted image width to 80 units
+            pdf.image(image_path, x=10, y=None, w=80)
 
     pdf.output(pdf_filename)
 
@@ -253,7 +233,6 @@ def clear_temp_images():
     history_text.delete(1.0, tk.END)
     messagebox.showinfo("Images Cleared", "All temporary images have been cleared.")
 
-# Create buttons
 btn_camera = tk.Button(frame, text="Use Camera", command=use_camera, bg=accent_color, fg=dark_fg)
 btn_camera.grid(row=5, column=0, sticky="ew")
 
@@ -266,5 +245,4 @@ btn_pdf.grid(row=5, column=2, sticky="ew")
 btn_clear_images = tk.Button(frame, text="Clear Temp Images", command=clear_temp_images, bg=accent_color, fg=dark_fg)
 btn_clear_images.grid(row=5, column=3, sticky="ew")
 
-# Start the main loop
 root.mainloop()
