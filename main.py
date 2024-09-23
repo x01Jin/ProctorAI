@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from tkinter.scrolledtext import ScrolledText
 from PIL import Image, ImageTk
 import cv2
@@ -8,6 +8,7 @@ import threading
 import time
 import os
 from fpdf import FPDF
+from datetime import datetime
 
 # Initialize Roboflow
 def initialize_roboflow():
@@ -21,12 +22,18 @@ model = initialize_roboflow()
 root = tk.Tk()
 root.title("ProctorAI")
 
+# Dark mode settings
+dark_bg = "#2b2b2b"
+dark_fg = "#e0e0e0"
+accent_color = "#007acc"
+root.configure(bg=dark_bg)
+
 # Create folder for temporary captures
 if not os.path.exists("tempcaptures"):
     os.makedirs("tempcaptures")
 
 # Frame to organize layout
-frame = tk.Frame(root)
+frame = tk.Frame(root, bg=dark_bg)
 frame.pack(fill=tk.BOTH, expand=True)
 
 # Configure grid weights for responsiveness
@@ -35,15 +42,15 @@ for i in range(5):
 frame.grid_rowconfigure(0, weight=1)
 
 # Canvas to display image
-canvas = tk.Canvas(frame, width=800, height=600)
+canvas = tk.Canvas(frame, width=800, height=600, bg=dark_bg, highlightthickness=0)
 canvas.grid(row=0, column=0, columnspan=4, sticky="nsew")
 
 # Label to display number of detected objects
-label = tk.Label(frame, text="Detected Objects: 0")
+label = tk.Label(frame, text="Detected Objects: 0", bg=dark_bg, fg=dark_fg)
 label.grid(row=1, column=0, columnspan=4, sticky="ew")
 
 # Slider for confidence threshold
-confidence_slider = tk.Scale(frame, from_=1, to=100, orient=tk.HORIZONTAL, label="Confidence Threshold")
+confidence_slider = tk.Scale(frame, from_=1, to=100, orient=tk.HORIZONTAL, label="Confidence Threshold", bg=dark_bg, fg=dark_fg, highlightthickness=0)
 confidence_slider.set(40)  # Default value
 confidence_slider.grid(row=2, column=0, columnspan=4, sticky="ew")
 
@@ -60,26 +67,24 @@ label_filter_menu = ttk.Combobox(frame, textvariable=label_filter, values=("chea
 label_filter_menu.grid(row=3, column=2, columnspan=2, sticky="ew")
 
 # Text widget to display predictions
-predictions_text = ScrolledText(frame, width=50, height=10)
+predictions_text = ScrolledText(frame, width=50, height=10, bg=dark_bg, fg=dark_fg)
 predictions_text.grid(row=4, column=0, columnspan=2, sticky="nsew")
 
 # History widget to show captured cheating images
-history_text = ScrolledText(frame, width=50, height=10)
+history_text = ScrolledText(frame, width=50, height=10, bg=dark_bg, fg=dark_fg)
 history_text.grid(row=4, column=2, columnspan=2, sticky="nsew")
 
 # Global variables
 current_image = None
-last_slider_value = None
 cap = None
-last_update_time = 0
 detections = []
+detection_active = False  # Track if detection is active
 
 def use_camera():
     """Start the camera feed."""
     global cap
     cap = cv2.VideoCapture(0)
     threading.Thread(target=update_camera, daemon=True).start()
-    threading.Thread(target=process_camera_feed, daemon=True).start()
 
 def update_camera():
     """Continuously read frames from the camera and display them."""
@@ -132,9 +137,19 @@ def update_canvas(image_rgb):
     canvas.create_image(0, 0, anchor=tk.NW, image=image_tk)
     canvas.image = image_tk
 
+def toggle_detection():
+    """Toggle the detection process on or off."""
+    global detection_active
+    detection_active = not detection_active
+    if detection_active:
+        threading.Thread(target=process_camera_feed, daemon=True).start()
+        btn_toggle_detection.config(text="Stop Detection")
+    else:
+        btn_toggle_detection.config(text="Start Detection")
+
 def process_camera_feed():
     """Continuously process the camera feed and detect objects."""
-    while cap and cap.isOpened():
+    while detection_active and cap and cap.isOpened():
         if current_image is not None:
             global detections
             detections = process_image(current_image)
@@ -179,74 +194,62 @@ def capture_cheating_image(detection):
     x0, y0 = int(x_center - width / 2), int(y_center - height / 2)
     x1, y1 = int(x_center + width / 2), int(y_center + height / 2)
 
-    # Ensure the crop coordinates are within image bounds
-    h, w, _ = current_image.shape
-    x0, y0 = max(0, x0), max(0, y0)
-    x1, y1 = min(w, x1), min(h, y1)
-
-    # Crop the cheating area
     cheating_image = current_image[y0:y1, x0:x1]
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    filename = f"tempcaptures/cheating_{timestamp}.jpg"
-    cv2.imwrite(filename, cheating_image)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    image_filename = f"tempcaptures/cheating_{timestamp}.jpg"
+    cv2.imwrite(image_filename, cheating_image)
 
-    # Add to history widget
-    history_text.insert(tk.END, f"Captured: {filename}\n")
+    # Add to history text widget
+    history_text.insert(tk.END, f"Cheating detected at {timestamp}. Saved to {image_filename}\n")
 
-def generate_pdf():
-    """Generate a PDF with the captured cheating images."""
-    pdf = FPDF()
-    image_files = [f for f in os.listdir("tempcaptures") if f.endswith(".jpg")]
-    if not image_files:
-        messagebox.showinfo("No Captures", "No cheating images found.")
+def save_pdf():
+    """Generate a PDF file with the cheating images."""
+    # Open file dialog to select save location
+    pdf_filename = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
+    if not pdf_filename:
         return
-    
-    for image_file in image_files:
-        pdf.add_page()
-        pdf.image(f"tempcaptures/{image_file}", x=10, y=10, w=190)  # Fit image to page
-    
-    pdf_file = "cheating_report.pdf"
-    pdf.output(pdf_file)
-    messagebox.showinfo("PDF Generated", f"PDF saved as {pdf_file}.")
-    
-    # Delete temporary images after generating PDF
-    clear_temp_captures()
 
-def clear_temp_captures():
-    """Clear all temporary captured images."""
-    for f in os.listdir("tempcaptures"):
-        os.remove(f"tempcaptures/{f}")
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
 
-def stop_preview():
-    """Stop the camera preview and clear the canvas."""
-    global cap, current_image
-    if cap:
-        cap.release()
-        cap = None
-    current_image = None
-    canvas.delete("all")
-    label.config(text="Detected Objects: 0")
-    predictions_text.delete(1.0, tk.END)
+    # Add current date and time to the PDF
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    pdf.cell(200, 10, txt=f"Cheating Report - {current_datetime}", ln=True, align="C")
+    
+    for filename in os.listdir("tempcaptures"):
+        if filename.endswith(".jpg"):
+            image_path = os.path.join("tempcaptures", filename)
+            pdf.cell(200, 10, txt=filename, ln=True)
+            pdf.image(image_path, x=10, y=None, w=100)
+
+    pdf.output(pdf_filename)
+
+    messagebox.showinfo("PDF Saved", f"PDF saved as {pdf_filename}")
+
+    clear_temp_images()
+
+def clear_temp_images():
+    """Clear all temporary capture images."""
+    for filename in os.listdir("tempcaptures"):
+        file_path = os.path.join("tempcaptures", filename)
+        os.remove(file_path)
     history_text.delete(1.0, tk.END)
+    messagebox.showinfo("Images Cleared", "All temporary images have been cleared.")
 
-def on_exit():
-    """Handle app exit, including clearing temp files."""
-    if messagebox.askokcancel("Quit", "Do you want to quit?"):
-        stop_preview()
-        clear_temp_captures()
-        root.destroy()
+# Create buttons
+btn_camera = tk.Button(frame, text="Use Camera", command=use_camera, bg=accent_color, fg=dark_fg)
+btn_camera.grid(row=5, column=0, sticky="ew")
 
-root.protocol("WM_DELETE_WINDOW", on_exit)
+btn_toggle_detection = tk.Button(frame, text="Start Detection", command=toggle_detection, bg=accent_color, fg=dark_fg)
+btn_toggle_detection.grid(row=5, column=1, sticky="ew")
 
-# Buttons to use camera, stop preview, and generate PDF
-btn_camera = tk.Button(frame, text="Use Camera", command=use_camera)
-btn_camera.grid(row=5, column=0, padx=10, pady=10, sticky="ew")
+btn_pdf = tk.Button(frame, text="Generate PDF", command=save_pdf, bg=accent_color, fg=dark_fg)
+btn_pdf.grid(row=5, column=2, sticky="ew")
 
-btn_stop = tk.Button(frame, text="Stop Preview", command=stop_preview)
-btn_stop.grid(row=5, column=2, padx=10, pady=10, sticky="ew")
+btn_clear_images = tk.Button(frame, text="Clear Temp Images", command=clear_temp_images, bg=accent_color, fg=dark_fg)
+btn_clear_images.grid(row=5, column=3, sticky="ew")
 
-btn_pdf = tk.Button(frame, text="Generate PDF", command=generate_pdf)
-btn_pdf.grid(row=5, column=3, padx=10, pady=10, sticky="ew")
-
-# Run the application
+# Start the main loop
 root.mainloop()
