@@ -211,18 +211,33 @@ def save_pdf():
 
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Add header page
+    pdf.add_page()
+    pdf.set_font("Arial", size=20)
+    page_height = pdf.h
+    header_height = 40
+    pdf.set_y((page_height - header_height) / 2)
+    pdf.cell(200, 10, txt="ProctorAI", ln=True, align="C")
+    pdf.cell(200, 10, txt="Generated Report", ln=True, align="C")
+    pdf.ln(10)
+    
+    # Add current date and time to the header page
+    current_datetime = datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.now().strftime("%H:%M:%S")
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt=f"Date: {current_datetime}", ln=True, align="C")
+    pdf.cell(200, 10, txt=f"Time: {current_time}", ln=True, align="C")
+    
+    # Add a new page for images
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-
-    # Add current date and time to the PDF
-    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pdf.cell(200, 10, txt=f"Cheating Report - {current_datetime}", ln=True, align="C")
     
     for filename in os.listdir("tempcaptures"):
         if filename.endswith(".jpg"):
             image_path = os.path.join("tempcaptures", filename)
             pdf.cell(200, 10, txt=filename, ln=True)
-            pdf.image(image_path, x=10, y=None, w=100)
+            pdf.image(image_path, x=10, y=None, w=80)  # Adjusted image width to 80 units
 
     pdf.output(pdf_filename)
 
