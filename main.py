@@ -9,6 +9,7 @@ import time
 import os
 from fpdf import FPDF
 from datetime import datetime
+import shutil
 
 def initialize_roboflow():
     rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
@@ -67,13 +68,11 @@ detections = []
 detection_active = False
 
 def use_camera():
-    """Start the camera feed."""
     global cap
     cap = cv2.VideoCapture(0)
     threading.Thread(target=update_camera, daemon=True).start()
 
 def update_camera():
-    """Continuously read frames from the camera and display them."""
     while cap and cap.isOpened():
         ret, frame = cap.read()
         if ret:
@@ -83,7 +82,6 @@ def update_camera():
         time.sleep(1 / 30)
 
 def display_frame(frame):
-    """Draw bounding boxes and labels on the frame and display it on the canvas."""
     global detections
     image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
@@ -94,7 +92,6 @@ def display_frame(frame):
     update_canvas(image_rgb)
 
 def draw_bounding_box(image, detection):
-    """Draw bounding boxes and labels/confidence on the image."""
     x_center, y_center = detection['x'], detection['y']
     width, height = detection['width'], detection['height']
     x0, y0 = int(x_center - width / 2), int(y_center - height / 2)
@@ -109,21 +106,18 @@ def draw_bounding_box(image, detection):
     put_text(image, label_text, x0, y0, color)
 
 def put_text(image, text, x, y, color):
-    """Put a label or confidence score on the image."""
     text_size, baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
     text_x, text_y = x, y - text_size[1] - 4
     cv2.rectangle(image, (text_x, text_y), (text_x + text_size[0], text_y + text_size[1] + baseline), color, -1)
     cv2.putText(image, text, (text_x, text_y + text_size[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
 def update_canvas(image_rgb):
-    """Update the canvas with the current image."""
     image_pil = Image.fromarray(image_rgb)
     image_tk = ImageTk.PhotoImage(image_pil)
     canvas.create_image(0, 0, anchor=tk.NW, image=image_tk)
     canvas.image = image_tk
 
 def toggle_detection():
-    """Toggle the detection process on or off."""
     global detection_active
     detection_active = not detection_active
     if detection_active:
@@ -133,7 +127,6 @@ def toggle_detection():
         btn_toggle_detection.config(text="Start Detection")
 
 def process_camera_feed():
-    """Continuously process the camera feed and detect objects."""
     while detection_active and cap and cap.isOpened():
         if current_image is not None:
             global detections
@@ -141,7 +134,6 @@ def process_camera_feed():
         time.sleep(1)
 
 def process_image(image):
-    """Run the Roboflow model on the image and return detections."""
     if image is None:
         return []
 
@@ -157,7 +149,6 @@ def process_image(image):
     return result['predictions']
 
 def display_predictions(predictions):
-    """Display object predictions in the text widget and capture cheating images."""
     predictions_text.delete(1.0, tk.END)
     for detection in predictions:
         predictions_text.insert(tk.END, f"Class: {detection['class']}, Confidence: {detection['confidence']:.2f}%, "
@@ -167,7 +158,6 @@ def display_predictions(predictions):
             capture_cheating_image(detection)
 
 def capture_cheating_image(detection):
-    """Capture and store images of detected cheating."""
     global current_image
 
     if current_image is None:
@@ -187,7 +177,6 @@ def capture_cheating_image(detection):
     history_text.insert(tk.END, f"Cheating detected at {timestamp}. Saved to {image_filename}\n")
 
 def save_pdf():
-    """Generate a PDF file with the cheating images."""
     pdf_filename = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
     if not pdf_filename:
         return
@@ -226,13 +215,11 @@ def save_pdf():
     clear_temp_images()
 
 def clear_temp_images():
-    """Clear all temporary capture images."""
-    for filename in os.listdir("tempcaptures"):
-        file_path = os.path.join("tempcaptures", filename)
-        os.remove(file_path)
+    shutil.rmtree("tempcaptures")
+    os.makedirs("tempcaptures")
     history_text.delete(1.0, tk.END)
     messagebox.showinfo("Images Cleared", "All temporary images have been cleared.")
-
+    
 btn_camera = tk.Button(frame, text="Use Camera", command=use_camera, bg=accent_color, fg=dark_fg)
 btn_camera.grid(row=5, column=0, sticky="ew")
 
