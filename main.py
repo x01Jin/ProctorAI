@@ -10,6 +10,7 @@ import os
 from fpdf import FPDF
 from datetime import datetime
 import shutil
+from pygrabber.dshow_graph import FilterGraph
 
 def initialize_roboflow():
     rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
@@ -36,7 +37,7 @@ for i in range(5):
     frame.grid_columnconfigure(i, weight=1)
 frame.grid_rowconfigure(0, weight=1)
 
-canvas = tk.Canvas(frame, width=800, height=600, bg=dark_bg, highlightthickness=0)
+canvas = tk.Canvas(frame, bg=dark_bg, highlightthickness=0)
 canvas.grid(row=0, column=0, columnspan=4, sticky="nsew")
 
 label = tk.Label(frame, text="Detected Objects: 0", bg=dark_bg, fg=dark_fg)
@@ -67,10 +68,40 @@ cap = None
 detections = []
 detection_active = False
 
+def list_cameras():
+    graph = FilterGraph()
+    devices = graph.get_input_devices()
+    return devices
+
+camera_devices = list_cameras()
+selected_camera = tk.StringVar(value=camera_devices[0] if camera_devices else "")
+camera_active = False
+
+def toggle_camera():
+    global camera_active
+    camera_active = not camera_active
+    if camera_active:
+        use_camera()
+        btn_camera.config(text="Stop Camera")
+    else:
+        stop_camera()
+        btn_camera.config(text="Start Camera")
+
 def use_camera():
     global cap
-    cap = cv2.VideoCapture(0)
-    threading.Thread(target=update_camera, daemon=True).start()
+    camera_name = selected_camera.get()
+    camera_index = camera_devices.index(camera_name)
+    cap = cv2.VideoCapture(camera_index)
+    if cap.isOpened():
+        threading.Thread(target=update_camera, daemon=True).start()
+    else:
+        messagebox.showerror("Error", "Selected camera is not available.")
+
+def stop_camera():
+    global cap
+    if cap and cap.isOpened():
+        cap.release()
+        cap = None
 
 def update_camera():
     while cap and cap.isOpened():
@@ -112,9 +143,28 @@ def put_text(image, text, x, y, color):
     cv2.putText(image, text, (text_x, text_y + text_size[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
 def update_canvas(image_rgb):
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
     image_pil = Image.fromarray(image_rgb)
+
+    # Maintain aspect ratio
+    image_aspect = image_pil.width / image_pil.height
+    canvas_aspect = canvas_width / canvas_height
+
+    if image_aspect > canvas_aspect:
+        # Image is wider than canvas
+        new_width = canvas_width
+        new_height = int(canvas_width / image_aspect)
+    else:
+        # Image is taller than canvas
+        new_height = canvas_height
+        new_width = int(canvas_height * image_aspect)
+
+    image_pil = image_pil.resize((new_width, new_height), Image.LANCZOS)
     image_tk = ImageTk.PhotoImage(image_pil)
-    canvas.create_image(0, 0, anchor=tk.NW, image=image_tk)
+
+    # Center the image on the canvas
+    canvas.create_image((canvas_width - new_width) // 2, (canvas_height - new_height) // 2, anchor=tk.NW, image=image_tk)
     canvas.image = image_tk
 
 def toggle_detection():
@@ -220,16 +270,28 @@ def clear_temp_images():
     history_text.delete(1.0, tk.END)
     messagebox.showinfo("Images Cleared", "All temporary images have been cleared.")
     
-btn_camera = tk.Button(frame, text="Use Camera", command=use_camera, bg=accent_color, fg=dark_fg)
-btn_camera.grid(row=5, column=0, sticky="ew")
+camera_label = tk.Label(frame, text="Select Camera:", bg=dark_bg, fg=dark_fg)
+camera_label.grid(row=5, column=0, sticky="ew")
+
+camera_menu = ttk.Combobox(frame, textvariable=selected_camera, values=camera_devices)
+camera_menu.grid(row=5, column=1, sticky="ew")
+
+btn_camera = tk.Button(frame, text="Start Camera", command=toggle_camera, bg=accent_color, fg=dark_fg)
+btn_camera.grid(row=5, column=2, sticky="ew")
 
 btn_toggle_detection = tk.Button(frame, text="Start Detection", command=toggle_detection, bg=accent_color, fg=dark_fg)
-btn_toggle_detection.grid(row=5, column=1, sticky="ew")
+btn_toggle_detection.grid(row=5, column=3, sticky="ew")
 
 btn_pdf = tk.Button(frame, text="Generate PDF", command=save_pdf, bg=accent_color, fg=dark_fg)
-btn_pdf.grid(row=5, column=2, sticky="ew")
+btn_pdf.grid(row=6, column=0, sticky="ew")
 
 btn_clear_images = tk.Button(frame, text="Clear Temp Images", command=clear_temp_images, bg=accent_color, fg=dark_fg)
-btn_clear_images.grid(row=5, column=3, sticky="ew")
+btn_clear_images.grid(row=6, column=1, sticky="ew")
+
+def on_resize(event):
+    if current_image is not None:
+        display_frame(current_image)
+
+root.bind("<Configure>", on_resize)
 
 root.mainloop()
