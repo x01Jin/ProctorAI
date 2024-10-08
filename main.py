@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, simpledialog
 from tkinter.scrolledtext import ScrolledText
 from PIL import Image, ImageTk
 import cv2
@@ -36,9 +36,9 @@ def create_temp_folder():
     if not os.path.exists("tempcaptures"):
         os.makedirs("tempcaptures")
 
-def capture_cheating_image(detection, current_image):
+def capture_cheating_image(detection, current_image, student_id):
     x_center, y_center = detection['x'], detection['y']
-    width, height = int(detection['width']), int(detection['height'])
+    width, height = int(detection['width'] * 1.5), int(detection['height'] * 1.5)
     x0, y0 = int(x_center - width / 2), int(y_center - height / 2)
     x1, y1 = int(x_center + width / 2), int(y_center + height / 2)
 
@@ -46,8 +46,8 @@ def capture_cheating_image(detection, current_image):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     image_filename = f"tempcaptures/cheating_{timestamp}.jpg"
 
-    resized_cheating_image = cv2.resize(cheating_image, (1000, 1000))
-    cv2.imwrite(image_filename, resized_cheating_image)
+    cv2.putText(cheating_image, f"Student ID: {student_id}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+    cv2.imwrite(image_filename, cheating_image)
 
     history_text.insert(tk.END, f"Cheating detected at {timestamp}. Saved to {image_filename}\n")
 
@@ -178,29 +178,86 @@ def display_predictions(predictions):
                                         f"X: {detection['x']}, Y: {detection['y']}, Width: {detection['width']}, "
                                         f"Height: {detection['height']}\n")
         if detection['class'] == "cheating":
-            capture_cheating_image(detection, current_image)
+            capture_cheating_image(detection, current_image, student_id="Unknown")
 
 # PDF Generation
+class PDF(FPDF):
+    def header(self):
+        self.set_font("Arial", 'B', 20)
+        self.cell(0, 5, "Proctor AI", ln=True, align='C')
+        self.set_font("Arial", 'B', 20)
+        self.cell(0, 8, "Generated Report", ln=True, align='C')
+        self.ln(5)
+        self.line(10, self.get_y(), 200, self.get_y())
+        self.ln(5)
+
+    def body(self, proctor_name, block, exam_date, subject, room):
+        self.set_font("Arial", 'B', 12)
+        self.cell(120, 7, f"Name: {proctor_name}", ln=False)
+        self.cell(0, 7, f"Time: {datetime.now().strftime('%H:%M:%S')}", ln=True)
+        self.cell(120, 7, f"Exam Date: {exam_date}", ln=False)
+        self.cell(0, 7, f"Subject: {subject}", ln=True)
+        self.cell(120, 7, f"Block: {block}", ln=False)
+        self.cell(0, 7, f"Room: {room}", ln=True)
+
+def prompt_report_details():
+    def on_submit():
+        nonlocal proctor_name, block, exam_date, subject, room
+        proctor_name = entry_proctor_name.get()
+        block = entry_block.get()
+        exam_date = entry_exam_date.get()
+        subject = entry_subject.get()
+        room = entry_room.get()
+        root.destroy()
+
+    root = tk.Tk()
+    root.withdraw()
+
+    dialog = tk.Toplevel(root)
+    dialog.title("Report Details")
+
+    tk.Label(dialog, text="Proctor's Name:").grid(row=0, column=0)
+    entry_proctor_name = tk.Entry(dialog)
+    entry_proctor_name.grid(row=0, column=1)
+
+    tk.Label(dialog, text="Block:").grid(row=1, column=0)
+    entry_block = tk.Entry(dialog)
+    entry_block.grid(row=1, column=1)
+
+    tk.Label(dialog, text="Exam Date:").grid(row=2, column=0)
+    entry_exam_date = tk.Entry(dialog)
+    entry_exam_date.grid(row=2, column=1)
+
+    tk.Label(dialog, text="Subject:").grid(row=3, column=0)
+    entry_subject = tk.Entry(dialog)
+    entry_subject.grid(row=3, column=1)
+
+    tk.Label(dialog, text="Room:").grid(row=4, column=0)
+    entry_room = tk.Entry(dialog)
+    entry_room.grid(row=4, column=1)
+
+    submit_button = tk.Button(dialog, text="Submit", command=on_submit)
+    submit_button.grid(row=5, columnspan=2)
+
+    proctor_name = block = exam_date = subject = room = None
+    root.wait_window(dialog)
+
+    return proctor_name, block, exam_date, subject, room
+
 def save_pdf():
+    proctor_name, block, exam_date, subject, room = prompt_report_details()
+    if not all([proctor_name, block, exam_date, subject, room]):
+        messagebox.showerror("Error", "All details must be provided.")
+        return
+
     pdf_filename = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
     if not pdf_filename:
         return
 
-    pdf = FPDF()
+    pdf = PDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Arial", size=20)
-    pdf.cell(200, 10, txt="ProctorAI", ln=True, align="C")
-    pdf.cell(200, 10, txt="Generated Report", ln=True, align="C")
-    
-    current_datetime = datetime.now().strftime("%Y-%m-%d")
-    current_time = datetime.now().strftime("%H:%M:%S")
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt=f"Date: {current_datetime}", ln=True, align="C")
-    pdf.cell(200, 10, txt=f"Time: {current_time}", ln=True, align="C")
-    
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    pdf.body(proctor_name, block, exam_date, subject, room)
     
     for filename in os.listdir("tempcaptures"):
         if filename.endswith(".jpg"):
@@ -221,7 +278,7 @@ dark_fg = "#e0e0e0"
 accent_color = "#007acc"
 root.configure(bg=dark_bg)
 
-# Initialize Temp Folder
+# Temp Folder for Image Captures
 create_temp_folder()
 
 # Define Widgets
