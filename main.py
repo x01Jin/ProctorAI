@@ -19,7 +19,7 @@ class CameraManager:
         self.cap = None
         self.current_image = None
         self.camera_devices = self.list_cameras()
-        self.selected_camera = tk.StringVar(root, value=self.camera_devices[0])
+        self.selected_camera = tk.StringVar(root, value=self.camera_devices[0] if self.camera_devices else '')
 
     def list_cameras(self):
         graph = FilterGraph()
@@ -311,21 +311,21 @@ if __name__ == "__main__":
     controls_frame = tk.Frame(root, bg=dark_bg)
     controls_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
-    def create_label_and_widget(frame, label_text, widget_class, widget_var, side=tk.LEFT):
+    def create_label_and_widget(frame, label_text, widget_class, widget_var, values, side=tk.LEFT):
         tk.Label(frame, text=label_text, fg=dark_fg, bg=dark_bg).pack(side=side)
-        widget = widget_class(frame, textvariable=widget_var)
+        widget = widget_class(frame, textvariable=widget_var, values=values)
         widget.pack(side=side)
         return widget
 
-    create_label_and_widget(controls_frame, "Select Camera:", ttk.Combobox, camera_manager.selected_camera)
+    create_label_and_widget(controls_frame, "Select Camera:", ttk.Combobox, camera_manager.selected_camera, camera_manager.camera_devices)
     btn_camera = tk.Button(controls_frame, text="Start Camera", command=camera_manager.toggle_camera, bg=accent_color, fg="white")
     btn_camera.pack(side=tk.LEFT)
 
     label_filter = tk.StringVar(value="cheating")
-    create_label_and_widget(controls_frame, "Filter By:", ttk.Combobox, label_filter)
+    create_label_and_widget(controls_frame, "Filter By:", ttk.Combobox, label_filter, ["cheating", "not_cheating"])
 
     display_mode = tk.StringVar(value="draw_labels")
-    create_label_and_widget(controls_frame, "", ttk.Combobox, display_mode)
+    create_label_and_widget(controls_frame, "Display Mode:", ttk.Combobox, display_mode, ["draw_labels", "draw_confidence"])
 
     btn_toggle_detection = tk.Button(controls_frame, text="Start Detection", command=detection_manager.toggle_detection, bg=accent_color, fg="white")
     btn_toggle_detection.pack(side=tk.LEFT)
@@ -335,7 +335,7 @@ if __name__ == "__main__":
     confidence_slider = tk.Scale(controls_frame, from_=0, to=100, orient=tk.HORIZONTAL, bg=dark_bg, fg=dark_fg)
     confidence_slider.pack(side=tk.LEFT)
 
-    btn_clear_images = tk.Button(controls_frame, text="Clear Images history", command=GUIManager.clear_temp_images, bg=accent_color, fg="white")
+    btn_clear_images = tk.Button(controls_frame, text="Clear Images History", command=GUIManager.clear_temp_images, bg=accent_color, fg="white")
     btn_clear_images.pack(side=tk.LEFT)
 
     btn_save_pdf = tk.Button(controls_frame, text="Generate PDF Report", command=PDFReport.save_pdf, bg=accent_color, fg="white")
