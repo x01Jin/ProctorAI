@@ -13,7 +13,7 @@ import shutil
 from pygrabber.dshow_graph import FilterGraph
 import numpy as np
 
-# Initialize Roboflow Model
+# The open source model being used currently.. meaning it needs to be connected to internet
 def initialize_roboflow():
     rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
     project = rf.workspace().project("giam_sat_gian_lan")
@@ -21,12 +21,11 @@ def initialize_roboflow():
 
 model = initialize_roboflow()
 
-# Global Variables
 camera_active = False
 detection_active = False
-cap = None  # Initialize camera capture variable
-current_image = None  # Placeholder for the current frame being processed
-detections = []  # List to hold detection results
+cap = None
+current_image = None
+detections = []
 
 # Helper Functions
 def list_cameras():
