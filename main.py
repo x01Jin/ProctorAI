@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
+from tkinter import ttk, messagebox, filedialog
 from tkinter.scrolledtext import ScrolledText
 from PIL import Image, ImageTk
 import cv2
@@ -27,16 +27,14 @@ class CameraManager:
 
     def toggle_camera(self):
         self.camera_active = not self.camera_active
+        btn_camera.config(text="Stop Camera" if self.camera_active else "Start Camera")
         if self.camera_active:
             self.use_camera()
-            btn_camera.config(text="Stop Camera")
         else:
             self.stop_camera()
-            btn_camera.config(text="Start Camera")
 
     def use_camera(self):
-        camera_name = self.selected_camera.get()
-        camera_index = self.camera_devices.index(camera_name)
+        camera_index = self.camera_devices.index(self.selected_camera.get())
         self.cap = cv2.VideoCapture(camera_index)
         if self.cap.isOpened():
             threading.Thread(target=self.update_camera, daemon=True).start()
@@ -49,7 +47,7 @@ class CameraManager:
             self.cap = None
 
     def update_camera(self):
-        while self.cap and self.cap.isOpened():
+        while self.camera_active and self.cap and self.cap.isOpened():
             ret, frame = self.cap.read()
             if ret:
                 self.current_image = frame
@@ -64,11 +62,9 @@ class DetectionManager:
 
     def toggle_detection(self):
         self.detection_active = not self.detection_active
+        btn_toggle_detection.config(text="Stop Detection" if self.detection_active else "Start Detection", bg=accent_color)
         if self.detection_active:
             threading.Thread(target=self.process_camera_feed, daemon=True).start()
-            btn_toggle_detection.config(text="Stop Detection", bg=accent_color)
-        else:
-            btn_toggle_detection.config(text="Start Detection", bg=accent_color)
 
     def process_camera_feed(self):
         while self.detection_active and camera_manager.cap and camera_manager.cap.isOpened():
@@ -95,7 +91,6 @@ class PDFReport(FPDF):
     def header(self):
         self.set_font("Arial", 'B', 20)
         self.cell(0, 5, "Proctor AI", ln=True, align='C')
-        self.set_font("Arial", 'B', 20)
         self.cell(0, 8, "Generated Report", ln=True, align='C')
         self.ln(5)
         self.line(10, self.get_y(), 200, self.get_y())
@@ -127,25 +122,17 @@ class PDFReport(FPDF):
         dialog = tk.Toplevel(root)
         dialog.title("Report Details")
 
-        tk.Label(dialog, text="Proctor's Name:").grid(row=0, column=0)
-        entry_proctor_name = tk.Entry(dialog)
-        entry_proctor_name.grid(row=0, column=1)
+        def create_label_entry(dialog, text, row):
+            tk.Label(dialog, text=text).grid(row=row, column=0)
+            entry = tk.Entry(dialog)
+            entry.grid(row=row, column=1)
+            return entry
 
-        tk.Label(dialog, text="Block:").grid(row=1, column=0)
-        entry_block = tk.Entry(dialog)
-        entry_block.grid(row=1, column=1)
-
-        tk.Label(dialog, text="Exam Date:").grid(row=2, column=0)
-        entry_exam_date = tk.Entry(dialog)
-        entry_exam_date.grid(row=2, column=1)
-
-        tk.Label(dialog, text="Subject:").grid(row=3, column=0)
-        entry_subject = tk.Entry(dialog)
-        entry_subject.grid(row=3, column=1)
-
-        tk.Label(dialog, text="Room:").grid(row=4, column=0)
-        entry_room = tk.Entry(dialog)
-        entry_room.grid(row=4, column=1)
+        entry_proctor_name = create_label_entry(dialog, "Proctor's Name:", 0)
+        entry_block = create_label_entry(dialog, "Block:", 1)
+        entry_exam_date = create_label_entry(dialog, "Exam Date:", 2)
+        entry_subject = create_label_entry(dialog, "Subject:", 3)
+        entry_room = create_label_entry(dialog, "Room:", 4)
 
         submit_button = tk.Button(dialog, text="Submit", command=on_submit)
         submit_button.grid(row=5, columnspan=2)
@@ -294,81 +281,73 @@ class GUIManager:
             if detection['class'] == "cheating":
                 GUIManager.capture_cheating_image(detection, camera_manager.current_image)
 
-# Initialize Roboflow model
 def initialize_roboflow():
     rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
     project = rf.workspace().project("giam_sat_gian_lan")
     return project.version(2).model
 
-model = initialize_roboflow()
+if __name__ == "__main__":
+    model = initialize_roboflow()
 
-# Tkinter GUI Setup
-root = tk.Tk()
-root.title("ProctorAI")
+    root = tk.Tk()
+    root.title("ProctorAI")
 
-dark_bg = "#2b2b2b"
-dark_fg = "#e0e0e0"
-accent_color = "#007acc"
-root.configure(bg=dark_bg)
+    dark_bg = "#2b2b2b"
+    dark_fg = "#e0e0e0"
+    accent_color = "#007acc"
+    root.configure(bg=dark_bg)
 
-# Initialize Managers
-camera_manager = CameraManager(root)
-detection_manager = DetectionManager(model)
+    camera_manager = CameraManager(root)
+    detection_manager = DetectionManager(model)
 
-# Temp Folder for Image Captures
-GUIManager.create_temp_folder()
+    GUIManager.create_temp_folder()
 
-# Define Widgets
-frame = tk.Frame(root, bg=dark_bg)
-frame.pack(fill=tk.BOTH, expand=True)
+    frame = tk.Frame(root, bg=dark_bg)
+    frame.pack(fill=tk.BOTH, expand=True)
 
-canvas = tk.Canvas(frame, bg=dark_bg, highlightthickness=0)
-canvas.pack(fill=tk.BOTH, expand=True)
+    canvas = tk.Canvas(frame, bg=dark_bg, highlightthickness=0)
+    canvas.pack(fill=tk.BOTH, expand=True)
 
-controls_frame = tk.Frame(root, bg=dark_bg)
-controls_frame.pack(side=tk.BOTTOM, fill=tk.X)
+    controls_frame = tk.Frame(root, bg=dark_bg)
+    controls_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
-camera_label = tk.Label(controls_frame, text="Select Camera:", fg=dark_fg, bg=dark_bg)
-camera_label.pack(side=tk.LEFT)
+    def create_label_and_widget(frame, label_text, widget_class, widget_var, side=tk.LEFT):
+        tk.Label(frame, text=label_text, fg=dark_fg, bg=dark_bg).pack(side=side)
+        widget = widget_class(frame, textvariable=widget_var)
+        widget.pack(side=side)
+        return widget
 
-camera_dropdown = ttk.Combobox(controls_frame, textvariable=camera_manager.selected_camera, values=camera_manager.camera_devices)
-camera_dropdown.pack(side=tk.LEFT)
+    create_label_and_widget(controls_frame, "Select Camera:", ttk.Combobox, camera_manager.selected_camera)
+    btn_camera = tk.Button(controls_frame, text="Start Camera", command=camera_manager.toggle_camera, bg=accent_color, fg="white")
+    btn_camera.pack(side=tk.LEFT)
 
-btn_camera = tk.Button(controls_frame, text="Start Camera", command=camera_manager.toggle_camera, bg=accent_color, fg="white")
-btn_camera.pack(side=tk.LEFT)
+    label_filter = tk.StringVar(value="cheating")
+    create_label_and_widget(controls_frame, "Filter By:", ttk.Combobox, label_filter)
 
-label_filter = tk.StringVar(value="cheating")
-filter_label = tk.Label(controls_frame, text="Filter By:", fg=dark_fg, bg=dark_bg)
-filter_label.pack(side=tk.LEFT)
-filter_dropdown = ttk.Combobox(controls_frame, textvariable=label_filter, values=["cheating", "not_cheating"])
-filter_dropdown.pack(side=tk.LEFT)
+    display_mode = tk.StringVar(value="draw_labels")
+    create_label_and_widget(controls_frame, "", ttk.Combobox, display_mode)
 
-display_mode = tk.StringVar(value="draw_labels")
-display_dropdown = ttk.Combobox(controls_frame, textvariable=display_mode, values=["draw_labels", "draw_confidence"])
-display_dropdown.pack(side=tk.LEFT)
+    btn_toggle_detection = tk.Button(controls_frame, text="Start Detection", command=detection_manager.toggle_detection, bg=accent_color, fg="white")
+    btn_toggle_detection.pack(side=tk.LEFT)
 
-btn_toggle_detection = tk.Button(controls_frame, text="Start Detection", command=detection_manager.toggle_detection, bg=accent_color, fg="white")
-btn_toggle_detection.pack(side=tk.LEFT)
+    confidence_label = tk.Label(controls_frame, text="Confidence Threshold:", fg=dark_fg, bg=dark_bg)
+    confidence_label.pack(side=tk.LEFT)
+    confidence_slider = tk.Scale(controls_frame, from_=0, to=100, orient=tk.HORIZONTAL, bg=dark_bg, fg=dark_fg)
+    confidence_slider.pack(side=tk.LEFT)
 
-confidence_label = tk.Label(controls_frame, text="Confidence Threshold:", fg=dark_fg, bg=dark_bg)
-confidence_label.pack(side=tk.LEFT)
-confidence_slider = tk.Scale(controls_frame, from_=0, to=100, orient=tk.HORIZONTAL, bg=dark_bg, fg=dark_fg)
-confidence_slider.pack(side=tk.LEFT)
+    btn_clear_images = tk.Button(controls_frame, text="Clear Images history", command=GUIManager.clear_temp_images, bg=accent_color, fg="white")
+    btn_clear_images.pack(side=tk.LEFT)
 
-btn_clear_images = tk.Button(controls_frame, text="Clear Images history", command=GUIManager.clear_temp_images, bg=accent_color, fg="white")
-btn_clear_images.pack(side=tk.LEFT)
+    btn_save_pdf = tk.Button(controls_frame, text="Generate PDF Report", command=PDFReport.save_pdf, bg=accent_color, fg="white")
+    btn_save_pdf.pack(side=tk.LEFT)
 
-btn_save_pdf = tk.Button(controls_frame, text="Generate PDF Report", command=PDFReport.save_pdf, bg=accent_color, fg="white")
-btn_save_pdf.pack(side=tk.LEFT)
+    predictions_text = ScrolledText(root, height=5, bg=dark_bg, fg=dark_fg)
+    predictions_text.pack(fill=tk.X, padx=10, pady=5)
 
-# Text Widgets for Predictions and History
-predictions_text = ScrolledText(root, height=5, bg=dark_bg, fg=dark_fg)
-predictions_text.pack(fill=tk.X, padx=10, pady=5)
+    history_text = ScrolledText(root, height=5, bg=dark_bg, fg=dark_fg)
+    history_text.pack(fill=tk.X, padx=10, pady=5)
 
-history_text = ScrolledText(root, height=5, bg=dark_bg, fg=dark_fg)
-history_text.pack(fill=tk.X, padx=10, pady=5)
+    label = tk.Label(root, text="Detected Objects: 0", bg=dark_bg, fg=dark_fg)
+    label.pack(fill=tk.X)
 
-label = tk.Label(root, text="Detected Objects: 0", bg=dark_bg, fg=dark_fg)
-label.pack(fill=tk.X)
-
-root.mainloop()
+    root.mainloop()
