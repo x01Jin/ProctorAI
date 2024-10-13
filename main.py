@@ -183,6 +183,21 @@ class PDFReport(FPDF):
 
 class GUIManager:
     @staticmethod
+    def update_status():
+        try:
+            requests.get("http://www.google.com", timeout=5)
+            internet_status = "Connected"
+        except requests.ConnectionError:
+            internet_status = "Disconnected"
+
+        if db_manager.connection and db_manager.connection.is_connected():
+            db_status = "Connected"
+        else:
+            db_status = "Disconnected"
+
+        status_label.config(text=f"Internet: {internet_status} | Database: {db_status}")
+
+    @staticmethod
     def create_temp_folder():
         if not os.path.exists("tempcaptures"):
             os.makedirs("tempcaptures")
@@ -291,7 +306,7 @@ def initialize_roboflow():
 
 if __name__ == "__main__":
     model = initialize_roboflow()
-    db_manager = dbc.DBManager()
+    db_manager = dbc.DatabaseManager()
 
     root = tk.Tk()
     root.title("ProctorAI")
