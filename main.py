@@ -12,6 +12,7 @@ from datetime import datetime
 import shutil
 from pygrabber.dshow_graph import FilterGraph
 import requests
+import dbc
 
 class CameraManager:
     def __init__(self, root):
@@ -144,36 +145,38 @@ class PDFReport(FPDF):
 
     @staticmethod
     def save_pdf():
-        proctor_name, block, exam_date, subject, room = PDFReport.prompt_report_details()
-        if not all([proctor_name, block, exam_date, subject, room]):
+        proctor, block, examdate, subject, room = PDFReport.prompt_report_details()
+        if not all([proctor, block, examdate, subject, room]):
             messagebox.showerror("Error", "All details must be provided.")
             return
-    
+
+        db_manager.insert_report_details(proctor, block, examdate, subject, room)
+
         pdf_filename = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
         if not pdf_filename:
             return
-    
+
         pdf = PDFReport()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        pdf.body(proctor_name, block, exam_date, subject, room)
-    
+        pdf.body(proctor, block, examdate, subject, room)
+
         image_count = 0
         x_positions = [10, 110]
         y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
-    
+
         for filename in os.listdir("tempcaptures"):
             if filename.endswith(".jpg"):
                 if image_count > 0 and image_count % 4 == 0:
                     pdf.add_page()
                     y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
-    
+
                 image_path = os.path.join("tempcaptures", filename)
                 x = x_positions[image_count % 2]
                 y = y_positions[(image_count // 2) % 2]
                 pdf.image(image_path, x=x, y=y, w=90, h=90)
                 image_count += 1
-    
+
         pdf.output(pdf_filename)
         messagebox.showinfo("PDF Saved", f"PDF saved as {pdf_filename}")
         GUIManager.clear_temp_images()
@@ -288,6 +291,7 @@ def initialize_roboflow():
 
 if __name__ == "__main__":
     model = initialize_roboflow()
+    db_manager = dbc.DBManager()
 
     root = tk.Tk()
     root.title("ProctorAI")
@@ -349,5 +353,14 @@ if __name__ == "__main__":
 
     label = tk.Label(root, text="Detected Objects: 0", bg=dark_bg, fg=dark_fg)
     label.pack(fill=tk.X)
+
+    # Add status bar
+    status_frame = tk.Frame(root, bg=dark_bg)
+    status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+    status_label = tk.Label(status_frame, text="Internet: Unknown | Database: Unknown", bg=dark_bg, fg=dark_fg)
+    status_label.pack(fill=tk.X)
+
+    # Start updating status
+    GUIManager.update_status()
 
     root.mainloop()
