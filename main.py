@@ -369,13 +369,11 @@ if __name__ == "__main__":
     label = tk.Label(root, text="Detected Objects: 0", bg=dark_bg, fg=dark_fg)
     label.pack(fill=tk.X)
 
-    # Add status bar
     status_frame = tk.Frame(root, bg=dark_bg)
     status_frame.pack(side=tk.BOTTOM, fill=tk.X)
     status_label = tk.Label(status_frame, text="Internet: Unknown | Database: Unknown", bg=dark_bg, fg=dark_fg)
     status_label.pack(fill=tk.X)
 
-    # Start updating status
     GUIManager.update_status()
 
     root.mainloop()
