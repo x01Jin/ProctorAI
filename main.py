@@ -8,6 +8,7 @@ import threading
 import time
 import os
 from fpdf import FPDF
+from tkcalendar import DateEntry
 from datetime import datetime
 import shutil
 from pygrabber.dshow_graph import FilterGraph
@@ -97,25 +98,29 @@ class PDFReport(FPDF):
         self.line(10, self.get_y(), 200, self.get_y())
         self.ln(5)
 
-    def body(self, proctor_name, block, exam_date, subject, room):
+    def body(self, proctor, block, date, subject, room, start, end):
         self.set_font("Arial", 'B', 12)
-        self.cell(120, 7, f"Name: {proctor_name}", ln=False)
+        self.cell(120, 7, f"Name: {proctor}", ln=False)
         self.cell(0, 7, f"Time: {datetime.now().strftime('%H:%M:%S')}", ln=True)
-        self.cell(120, 7, f"Exam Date: {exam_date}", ln=False)
-        self.cell(0, 7, f"Subject: {subject}", ln=True)
-        self.cell(120, 7, f"Block: {block}", ln=False)
-        self.cell(0, 7, f"Room: {room}", ln=True)
+        self.cell(120, 7, f"Exam Date: {date}", ln=False)
+        self.cell(0, 7, f"subject: {subject}", ln=True)
+        self.cell(120, 7, f"block: {block}", ln=False)
+        self.cell(0, 7, f"room: {room}", ln=True)
+        self.cell(120, 7, f"Start Time: {start}", ln=False)
+        self.cell(0, 7, f"End Time: {end}", ln=True)
 
     @staticmethod
     def prompt_report_details():
         def on_submit():
-            nonlocal proctor_name, block, exam_date, subject, room
-            proctor_name = entry_proctor_name.get()
+            nonlocal proctor, block, date, subject, room, start, end
+            proctor = entry_proctor.get()
             block = entry_block.get()
-            exam_date = entry_exam_date.get()
+            date = entry_date.get_date().strftime('%Y-%m-%d')
             subject = entry_subject.get()
             room = entry_room.get()
-            root.destroy()
+            start = entry_start.get()
+            end = entry_end.get()
+            dialog.destroy()
 
         root = tk.Tk()
         root.withdraw()
@@ -124,33 +129,41 @@ class PDFReport(FPDF):
         dialog.title("Report Details")
 
         def create_label_entry(dialog, text, row):
-            tk.Label(dialog, text=text).grid(row=row, column=0)
+            tk.Label(dialog, text=text).grid(row=row, column=0, padx=5, pady=5)
             entry = tk.Entry(dialog)
-            entry.grid(row=row, column=1)
+            entry.grid(row=row, column=1, padx=5, pady=5)
             return entry
 
-        entry_proctor_name = create_label_entry(dialog, "Proctor's Name:", 0)
-        entry_block = create_label_entry(dialog, "Block:", 1)
-        entry_exam_date = create_label_entry(dialog, "Exam Date:", 2)
-        entry_subject = create_label_entry(dialog, "Subject:", 3)
-        entry_room = create_label_entry(dialog, "Room:", 4)
+        entry_proctor = create_label_entry(dialog, "Proctor's Name:", 0)
+        entry_block = create_label_entry(dialog, "block:", 1)
+        entry_date = DateEntry(dialog, date_pattern='y-mm-dd')
+        entry_date.grid(row=2, column=1, padx=5, pady=5)
+        tk.Label(dialog, text="Exam Date:").grid(row=2, column=0, padx=5, pady=5)
+        entry_subject = create_label_entry(dialog, "subject:", 3)
+        entry_room = create_label_entry(dialog, "room:", 4)
+        entry_start = ttk.Combobox(dialog, values=[f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
+        entry_start.grid(row=5, column=1, padx=5, pady=5)
+        tk.Label(dialog, text="Start Time:").grid(row=5, column=0, padx=5, pady=5)
+        entry_end = ttk.Combobox(dialog, values=[f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
+        entry_end.grid(row=6, column=1, padx=5, pady=5)
+        tk.Label(dialog, text="End Time:").grid(row=6, column=0, padx=5, pady=5)
 
         submit_button = tk.Button(dialog, text="Submit", command=on_submit)
-        submit_button.grid(row=5, columnspan=2)
+        submit_button.grid(row=7, columnspan=2)
 
-        proctor_name = block = exam_date = subject = room = None
+        proctor = block = date = subject = room = start = end = None
         root.wait_window(dialog)
 
-        return proctor_name, block, exam_date, subject, room
+        return proctor, block, date, subject, room, start, end
 
     @staticmethod
     def save_pdf():
-        proctor, block, examdate, subject, room = PDFReport.prompt_report_details()
-        if not all([proctor, block, examdate, subject, room]):
-            messagebox.showerror("Error", "All details must be provided.")
+        proctor, block, date, subject, room, start, end = PDFReport.prompt_report_details()
+        if not all([proctor, block, date, subject, room, start, end]):
+            messagebox.showerror("Error", "All fields must be filled out.")
             return
 
-        db_manager.insert_report_details(proctor, block, examdate, subject, room)
+        db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
 
         pdf_filename = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
         if not pdf_filename:
@@ -159,7 +172,7 @@ class PDFReport(FPDF):
         pdf = PDFReport()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        pdf.body(proctor, block, examdate, subject, room)
+        pdf.body(proctor, block, date, subject, room, start, end)
 
         image_count = 0
         x_positions = [10, 110]
@@ -167,14 +180,8 @@ class PDFReport(FPDF):
 
         for filename in os.listdir("tempcaptures"):
             if filename.endswith(".jpg"):
-                if image_count > 0 and image_count % 4 == 0:
-                    pdf.add_page()
-                    y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
-
                 image_path = os.path.join("tempcaptures", filename)
-                x = x_positions[image_count % 2]
-                y = y_positions[(image_count // 2) % 2]
-                pdf.image(image_path, x=x, y=y, w=90, h=90)
+                pdf.image(image_path, x=x_positions[image_count % 2], y=y_positions[image_count // 2], w=90)
                 image_count += 1
 
         pdf.output(pdf_filename)

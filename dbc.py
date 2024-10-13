@@ -26,7 +26,7 @@ class DatabaseManager:
         if self.connection is None or not self.connection.is_connected():
             self.connect()
 
-    def insert_report_details(self, proctor, block, examdate, subject, room):
+    def insert_report_details(self, proctor, block, date, subject, room, start, end):
         self.ensure_connection()
         if self.connection is None:
             logging.error("Failed to insert report details: No database connection")
@@ -35,10 +35,10 @@ class DatabaseManager:
         try:
             cursor = self.connection.cursor()
             query = """
-            INSERT INTO reportlog (proctor, block, examdate, subject, room)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO reportlog (proctor, block, date, subject, room, start, end)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
-            values = (proctor, block, examdate, subject, room)
+            values = (proctor, block, date, subject, room, start, end)
             cursor.execute(query, values)
             self.connection.commit()
             cursor.close()

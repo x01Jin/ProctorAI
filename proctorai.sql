@@ -28,12 +28,15 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `reportlog` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `proctor` varchar(255) NOT NULL,
   `block` varchar(255) NOT NULL,
-  `examdate` date NOT NULL,
+  `date` date NOT NULL,
   `subject` varchar(255) NOT NULL,
-  `room` varchar(255) NOT NULL
+  `room` varchar(255) NOT NULL,
+  `start` TIME NOT NULL,
+  `end` TIME NOT NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
