@@ -15,6 +15,7 @@ from pygrabber.dshow_graph import FilterGraph
 import requests
 import dbc
 
+
 class CameraManager:
     def __init__(self, root):
         self.camera_active = False
@@ -39,7 +40,7 @@ class CameraManager:
         camera_index = self.camera_devices.index(self.selected_camera.get())
         self.cap = cv2.VideoCapture(camera_index)
         if self.cap.isOpened():
-            threading.Thread(target=self.update_camera, daemon=True).start()
+            thread_manager.start_thread("update_camera", self.update_camera)
         else:
             messagebox.showerror("Error", "Selected camera is not available.")
 
@@ -53,8 +54,10 @@ class CameraManager:
             ret, frame = self.cap.read()
             if ret:
                 self.current_image = frame
-                GUIManager.display_frame(frame)
-            time.sleep(1 / 30)
+                if root.winfo_exists():
+                    GUIManager.display_frame(frame)
+            time.sleep(1 / 60)
+
 
 class DetectionManager:
     def __init__(self, model):
@@ -66,7 +69,7 @@ class DetectionManager:
         self.detection_active = not self.detection_active
         btn_toggle_detection.config(text="Stop Detection" if self.detection_active else "Start Detection", bg=accent_color)
         if self.detection_active:
-            threading.Thread(target=self.process_camera_feed, daemon=True).start()
+            thread_manager.start_thread("process_camera_feed", self.process_camera_feed)
 
     def process_camera_feed(self):
         while self.detection_active and camera_manager.cap and camera_manager.cap.isOpened():
@@ -88,6 +91,7 @@ class DetectionManager:
             btn_toggle_detection.config(text="Retry", bg="red")
             self.detection_active = False
             return []
+
 
 class PDFReport(FPDF):
     def header(self):
@@ -170,39 +174,68 @@ class PDFReport(FPDF):
             return
 
         pdf = PDFReport()
-        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_auto_page_break(auto=True, margin=10)
         pdf.add_page()
         pdf.body(proctor, block, date, subject, room, start, end)
 
         image_count = 0
         x_positions = [10, 110]
         y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
-
+    
         for filename in os.listdir("tempcaptures"):
             if filename.endswith(".jpg"):
+                if image_count > 0 and image_count % 4 == 0:
+                    pdf.add_page()
+                    y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
+    
                 image_path = os.path.join("tempcaptures", filename)
-                pdf.image(image_path, x=x_positions[image_count % 2], y=y_positions[image_count // 2], w=90)
+                x = x_positions[image_count % 2]
+                y = y_positions[(image_count // 2) % 2]
+                pdf.image(image_path, x=x, y=y, w=90, h=90)
                 image_count += 1
 
         pdf.output(pdf_filename)
         messagebox.showinfo("PDF Saved", f"PDF saved as {pdf_filename}")
         GUIManager.clear_temp_images()
 
+
 class GUIManager:
     @staticmethod
-    def update_status():
+    def update_status(internet_status_label, database_status_label):
+        if not internet_status_label.winfo_exists() or not database_status_label.winfo_exists():
+            return
+
+        GUIManager.update_internet_status(internet_status_label)
+        GUIManager.update_database_status(database_status_label)
+        GUIManager.schedule_database_status_update(database_status_label)
+
+    @staticmethod
+    def update_internet_status(internet_status_label):
+        internet_status = "Connected" if GUIManager.check_internet_connection() else "Disconnected"
+        internet_status_label.config(text=f"Internet: {internet_status}")
+
+    @staticmethod
+    def update_database_status(database_status_label):
+        if db_manager.connection is None or not db_manager.connection.is_connected():
+            db_manager.connect()
+        database_status = "Connected" if db_manager.connection and db_manager.connection.is_connected() else "Disconnected"
+        database_status_label.config(text=f"Database: {database_status}")
+
+    @staticmethod
+    def check_internet_connection():
         try:
-            requests.get("http://www.google.com", timeout=5)
-            internet_status = "Connected"
+            requests.get("http://www.google.com", timeout=3)
+            return True
         except requests.ConnectionError:
-            internet_status = "Disconnected"
+            return False
 
-        if db_manager.connection and db_manager.connection.is_connected():
-            db_status = "Connected"
-        else:
-            db_status = "Disconnected"
-
-        status_label.config(text=f"Internet: {internet_status} | Database: {db_status}")
+    @staticmethod
+    def schedule_database_status_update(database_status_label):
+        def update():
+            GUIManager.update_database_status(database_status_label)
+            database_status_label.after(3000, update)
+        
+        update()
 
     @staticmethod
     def create_temp_folder():
@@ -306,10 +339,37 @@ class GUIManager:
             if detection['class'] == "cheating":
                 GUIManager.capture_cheating_image(detection, camera_manager.current_image)
 
+
+class ThreadManager:
+    def __init__(self):
+        self.threads = {}
+
+    def start_thread(self, name, target, args=(), daemon=True):
+        if name in self.threads and self.threads[name].is_alive():
+            print(f"Thread {name} is already running.")
+            return
+        thread = threading.Thread(target=target, args=args, daemon=daemon)
+        self.threads[name] = thread
+        thread.start()
+        print(f"Thread {name} started.")
+
+    def stop_thread(self, name):
+        if name in self.threads and self.threads[name].is_alive():
+            self.threads[name].do_run = False
+            self.threads[name].join()
+            print(f"Thread {name} stopped.")
+        else:
+            print(f"Thread {name} is not running.")
+
+    def is_thread_running(self, name):
+        return name in self.threads and self.threads[name].is_alive()
+
+
 def initialize_roboflow():
     rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
     project = rf.workspace().project("giam_sat_gian_lan")
     return project.version(2).model
+
 
 if __name__ == "__main__":
     model = initialize_roboflow()
@@ -323,9 +383,10 @@ if __name__ == "__main__":
     accent_color = "#007acc"
     root.configure(bg=dark_bg)
 
+    thread_manager = ThreadManager()
     camera_manager = CameraManager(root)
     detection_manager = DetectionManager(model)
-
+    
     GUIManager.create_temp_folder()
 
     frame = tk.Frame(root, bg=dark_bg)
@@ -378,9 +439,16 @@ if __name__ == "__main__":
 
     status_frame = tk.Frame(root, bg=dark_bg)
     status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-    status_label = tk.Label(status_frame, text="Internet: Unknown | Database: Unknown", bg=dark_bg, fg=dark_fg)
-    status_label.pack(fill=tk.X)
+    
+    status_labels_frame = tk.Frame(status_frame)
+    status_labels_frame.pack()
 
-    GUIManager.update_status()
+    internet_status_label = tk.Label(status_labels_frame, text="Internet: Checking", bg=dark_bg, fg=dark_fg)
+    internet_status_label.pack(side=tk.LEFT)
+
+    database_status_label = tk.Label(status_labels_frame, text="Database: Checking", bg=dark_bg, fg=dark_fg)
+    database_status_label.pack(side=tk.LEFT)
+
+    thread_manager.start_thread("update_status", GUIManager.update_status, args=(internet_status_label, database_status_label))
 
     root.mainloop()
