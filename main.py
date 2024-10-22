@@ -16,7 +16,7 @@ import requests
 import dbc
 from concurrent.futures import ThreadPoolExecutor
 
-
+#sdasdasdasd
 class CameraManager:
     def __init__(self, root):
         self.camera_active = False
