@@ -2,6 +2,6 @@ pillow
 opencv-python
 roboflow
 fpdf
+tkcalendar
 pygrabber
 requests
-mysql-connector-python
