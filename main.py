@@ -477,6 +477,7 @@ if __name__ == "__main__":
             camera_manager.stop_camera()
             thread_manager.stop_all_threads()
             thread_manager.stop_thread("update_status")
+            GUIManager.clear_temp_images()
             root.after(3000, root.quit)
 
     root.protocol("WM_DELETE_WINDOW", on_exit)

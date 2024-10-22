@@ -5,3 +5,4 @@ fpdf
 tkcalendar
 pygrabber
 requests
+mysql-connector-python
