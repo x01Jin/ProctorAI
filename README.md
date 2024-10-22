@@ -13,10 +13,13 @@ This project requires several Python packages to function correctly. A `requirem
 ### Installation Instructions
 
 1. **Clone the Repository**
+    - if you have Git installed open ide terminal and do this:
     ```bash
     git clone https://github.com/x01Jin/ProctorAI
     cd ProctorAI
     ```
+    - if you do not have git installed Just download the Code (go at the top of this page and find the green "Code" button click it and "Download ZIP")
+
 2. **Set Up a Virtual Environment (Optional but Recommended)**
     Using venv:
     ```bash
@@ -28,6 +31,16 @@ This project requires several Python packages to function correctly. A `requirem
     ```bash
     pip install -r requirements.txt
     ```
+4. **Database Setup**
+    - install and setup "XAMPP"
+    - open XAMPP Control Panel
+    - start "Apache" and "MySQL"
+    - click Admin of MySQL
+    - find and click Import tab once in phpMyAdmin
+    - click "Choose File" and use "proctorai.sql" which is included when cloning/downloaded the repository
+    - click "Import" at the very bottom
+    - after that the database is ready
+
 ### Usage Instructions
 
 1. **Run the Application**
