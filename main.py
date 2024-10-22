@@ -14,6 +14,7 @@ import shutil
 from pygrabber.dshow_graph import FilterGraph
 import requests
 import dbc
+from concurrent.futures import ThreadPoolExecutor
 
 
 class CameraManager:
@@ -23,6 +24,7 @@ class CameraManager:
         self.current_image = None
         self.camera_devices = self.list_cameras()
         self.selected_camera = tk.StringVar(root, value=self.camera_devices[0] if self.camera_devices else '')
+        self.stop_event = threading.Event()
 
     def list_cameras(self):
         graph = FilterGraph()
@@ -40,17 +42,21 @@ class CameraManager:
         camera_index = self.camera_devices.index(self.selected_camera.get())
         self.cap = cv2.VideoCapture(camera_index)
         if self.cap.isOpened():
+            self.stop_event.clear()
             thread_manager.start_thread("update_camera", self.update_camera)
         else:
             messagebox.showerror("Error", "Selected camera is not available.")
 
     def stop_camera(self):
+        self.camera_active = False
+        self.stop_event.set()
+        thread_manager.stop_thread("update_camera")
         if self.cap and self.cap.isOpened():
             self.cap.release()
             self.cap = None
 
     def update_camera(self):
-        while self.camera_active and self.cap and self.cap.isOpened():
+        while not self.stop_event.is_set() and self.cap and self.cap.isOpened():
             ret, frame = self.cap.read()
             if ret:
                 self.current_image = frame
@@ -64,15 +70,24 @@ class DetectionManager:
         self.detection_active = False
         self.model = model
         self.detections = []
+        self.stop_event = threading.Event()
 
     def toggle_detection(self):
         self.detection_active = not self.detection_active
         btn_toggle_detection.config(text="Stop Detection" if self.detection_active else "Start Detection", bg=accent_color)
         if self.detection_active:
+            self.stop_event.clear()
             thread_manager.start_thread("process_camera_feed", self.process_camera_feed)
+        else:
+            self.stop_detection()
+
+    def stop_detection(self):
+        self.detection_active = False
+        self.stop_event.set()
+        thread_manager.stop_thread("process_camera_feed")
 
     def process_camera_feed(self):
-        while self.detection_active and camera_manager.cap and camera_manager.cap.isOpened():
+        while not self.stop_event.is_set() and camera_manager.cap and camera_manager.cap.isOpened():
             if camera_manager.current_image is not None:
                 self.detections = self.process_image(camera_manager.current_image)
             time.sleep(1)
@@ -342,27 +357,32 @@ class GUIManager:
 
 class ThreadManager:
     def __init__(self):
-        self.threads = {}
+        self.executor = ThreadPoolExecutor(max_workers=5)
+        self.futures = {}
 
-    def start_thread(self, name, target, args=(), daemon=True):
-        if name in self.threads and self.threads[name].is_alive():
+    def start_thread(self, name, target, args=()):
+        if name in self.futures and not self.futures[name].done():
             print(f"Thread {name} is already running.")
             return
-        thread = threading.Thread(target=target, args=args, daemon=daemon)
-        self.threads[name] = thread
-        thread.start()
+        future = self.executor.submit(target, *args)
+        self.futures[name] = future
         print(f"Thread {name} started.")
 
     def stop_thread(self, name):
-        if name in self.threads and self.threads[name].is_alive():
-            self.threads[name].do_run = False
-            self.threads[name].join()
+        if name in self.futures and not self.futures[name].done():
+            self.futures[name].cancel()
             print(f"Thread {name} stopped.")
         else:
             print(f"Thread {name} is not running.")
 
+    def stop_all_threads(self):
+        for name, future in self.futures.items():
+            if not future.done():
+                future.cancel()
+                print(f"Thread {name} stopped.")
+
     def is_thread_running(self, name):
-        return name in self.threads and self.threads[name].is_alive()
+        return name in self.futures and not self.futures[name].done()
 
 
 def initialize_roboflow():
@@ -401,7 +421,7 @@ if __name__ == "__main__":
     def create_label_and_widget(frame, label_text, widget_class, widget_var, values, side=tk.LEFT):
         tk.Label(frame, text=label_text, fg=dark_fg, bg=dark_bg).pack(side=side)
         widget = widget_class(frame, textvariable=widget_var, values=values)
-        widget.pack(side=side)
+        widget.pack(side=side, padx=5, pady=5)
         return widget
 
     create_label_and_widget(controls_frame, "Select Camera:", ttk.Combobox, camera_manager.selected_camera, camera_manager.camera_devices)
@@ -451,4 +471,14 @@ if __name__ == "__main__":
 
     thread_manager.start_thread("update_status", GUIManager.update_status, args=(internet_status_label, database_status_label))
 
+    def on_exit():
+        if messagebox.askokcancel("Quit", "Do you really wish to quit?"):
+            detection_manager.stop_detection()
+            camera_manager.stop_camera()
+            thread_manager.stop_all_threads()
+            thread_manager.stop_thread("update_status")
+            root.after(3000, root.quit)
+
+    root.protocol("WM_DELETE_WINDOW", on_exit)
     root.mainloop()
+
