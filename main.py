@@ -126,6 +126,8 @@ class MainWindow(QMainWindow):
         self.generatePdfButton = QPushButton("Generate PDF Report")
         report_manager_layout.addWidget(self.generatePdfButton)
 
+        report_manager_dock.setMinimumWidth(300)
+
         return report_manager_dock
     
     def detectionControlsDock(self):
@@ -246,7 +248,7 @@ class CameraManager(QObject):
         self.camera_devices = self.list_cameras()
         self.selected_camera = self.camera_devices[0] if self.camera_devices else ''
         self.camera_thread = None
-    
+
     def list_cameras(self):
         graph = FilterGraph()
         devices = graph.get_input_devices()
@@ -256,10 +258,10 @@ class CameraManager(QObject):
     def toggle_camera(self):
         self.camera_active = not self.camera_active
         if self.camera_active:
-            self.main_window.startCameraButton.setText("Stop Camera")
+            self.main_window.startCameraButton.setText("Start Camera")
             self.use_camera()
         else:
-            self.main_window.startCameraButton.setText("Start Camera")
+            self.main_window.startCameraButton.setText("Stop Camera")
             self.stop_camera()
 
     def use_camera(self):
@@ -293,6 +295,9 @@ class CameraManager(QObject):
     def clear_display(self):
         self.main_window.displayLabel.clear()
         self.main_window.displayLabel.setStyleSheet("background-color: black; border: 2px solid #444444;")
+
+    def __del__(self):
+        self.stop_camera()
 
 class DetectionManager(QObject):
     detections_ready = pyqtSignal(list)
@@ -409,7 +414,8 @@ class PDFReport(FPDF):
             print("All fields must be filled out.")
             return
 
-        pdf_filename, _ = QFileDialog.getSaveFileName(None, "Save PDF", "", "PDF files (*.pdf)")
+        desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        pdf_filename, _ = QFileDialog.getSaveFileName(None, "Save PDF", desktop_path, "PDF files (*.pdf)")
         if not pdf_filename:
             return
 
@@ -434,12 +440,11 @@ class PDFReport(FPDF):
                 pdf.image(image_path, x=x, y=y, w=90, h=90)
                 image_count += 1
 
-        pdf.output(pdf_filename)
-        print(f"PDF saved as {pdf_filename}")
-
         db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
 
         GUIManager.clear_temp_images()
+
+        QMessageBox.information(None, "PDF Report", f"Report saved in {pdf_filename}")
 
 class GUIManager:
     @staticmethod
@@ -495,8 +500,6 @@ class GUIManager:
 
         cv2.imwrite(image_filename, cheating_image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-        print(f"Cheating detected at {timestamp}. Saved to {image_filename}")
-
     @staticmethod
     def clear_temp_images():
         folder = "tempcaptures"
@@ -510,6 +513,11 @@ class GUIManager:
                         shutil.rmtree(file_path)
                 except Exception as e:
                     print(f'Failed to delete {file_path}. Reason: {e}')
+        
+        while window.imageLayout.count():
+            child = window.imageLayout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
 
     @staticmethod
     def display_frame(frame, display_label):
