@@ -1,111 +1,344 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-from tkinter.scrolledtext import ScrolledText
-from PIL import Image, ImageTk
-import cv2
+import sys
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QPushButton, QComboBox, QSlider, QStatusBar, QDockWidget, 
+    QToolBar, QAction, QSplitter, QScrollArea, QDialog, QFileDialog, QLineEdit, QDateEdit, QMessageBox
+)
 from roboflow import Roboflow
-import threading
-import time
-import os
-from fpdf import FPDF
-from tkcalendar import DateEntry
-from datetime import datetime
-import shutil
+from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate, QObject, QTimer
+from PyQt5.QtGui import QPalette, QColor, QPixmap, QImage
 from pygrabber.dshow_graph import FilterGraph
+import cv2
+import os
+from dbc import db_manager
+import shutil
+from datetime import datetime
 import requests
-import dbc
-from concurrent.futures import ThreadPoolExecutor
+from fpdf import FPDF
 
+def initialize_roboflow():
+    rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
+    project = rf.workspace().project("giam_sat_gian_lan")
+    return project.version(2).model
 
-class CameraManager:
-    def __init__(self, root):
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("ProctorAI")
+        self.setGeometry(100, 100, 1000, 700)
+        
+        self.setupDarkPallete()
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        self.setupDocks()
+        self.setupStatusBar()
+        self.setupTimers()
+        self.setupToolbar()
+
+        self.camera_manager = CameraManager(self)
+        self.detection_manager = DetectionManager(initialize_roboflow(), self)
+
+        self.camera_manager.frame_ready.connect(self.update_display)
+        self.detection_manager.detections_ready.connect(self.update_detections)
+        
+        self.startCameraButton.clicked.connect(self.toggle_camera)
+        self.startDetectionButton.clicked.connect(self.toggle_detection)
+        self.generatePdfButton.clicked.connect(PDFReport.save_pdf)
+        
+    def setupDarkPallete(self):
+        dark_pallete = QPalette()
+        dark_pallete.setColor(QPalette.Window, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.WindowText, Qt.white)
+        dark_pallete.setColor(QPalette.Base, QColor(35, 35, 35))
+        dark_pallete.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.ToolTipBase, Qt.white)
+        dark_pallete.setColor(QPalette.ToolTipText, Qt.white)
+        dark_pallete.setColor(QPalette.Text, Qt.white)
+        dark_pallete.setColor(QPalette.Button, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.ButtonText, Qt.white)
+        dark_pallete.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        dark_pallete.setColor(QPalette.HighlightedText, Qt.black)
+        self.setPalette(dark_pallete)
+
+    def setupDocks(self):
+        self.previewDock = QDockWidget("Camera and Display", self)
+        self.previewDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        camera_display_container = self.cameraDisplayDock()
+        self.previewDock.setWidget(camera_display_container)
+
+        self.reportDock = QDockWidget("Captured Images", self)
+        self.reportDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        report_manager_container = self.reportManagerDock()
+        self.reportDock.setWidget(report_manager_container)
+
+        self.controlsDock = QDockWidget("Detection Controls", self)
+        self.controlsDock.setAllowedAreas(Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea)
+        detection_controls_container = self.detectionControlsDock()
+        self.controlsDock.setWidget(detection_controls_container)
+
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(self.previewDock)
+        splitter.addWidget(self.reportDock)
+        self.setCentralWidget(splitter)
+
+        self.addDockWidget(Qt.TopDockWidgetArea, self.controlsDock)
+
+    def cameraDisplayDock(self):
+        camera_display_container = QWidget()
+        camera_display_layout = QVBoxLayout(camera_display_container)
+        camera_display_layout.setContentsMargins(10, 10, 10, 10)
+        camera_display_layout.setSpacing(10)
+
+        camera_controls_layout = QHBoxLayout()
+        self.cameraCombo = QComboBox()
+        camera_controls_layout.addWidget(QLabel("Select Camera:"))
+        camera_controls_layout.addWidget(self.cameraCombo)
+
+        self.startCameraButton = QPushButton("Start Camera")
+        camera_controls_layout.addWidget(self.startCameraButton)
+
+        display_label_layout = QVBoxLayout()
+        self.displayLabel = QLabel()
+        self.displayLabel.setFixedSize(640, 480)
+        self.displayLabel.setStyleSheet("background-color: black; border: 2px solid #444444;")
+        display_label_layout.addWidget(self.displayLabel, alignment=Qt.AlignCenter)
+
+        camera_display_layout.addLayout(camera_controls_layout)
+        camera_display_layout.addLayout(display_label_layout)
+
+        return camera_display_container
+
+    def reportManagerDock(self):
+        report_manager_dock = QWidget()
+        report_manager_layout = QVBoxLayout(report_manager_dock)
+        report_manager_layout.setContentsMargins(10, 10, 10, 10)
+        report_manager_layout.setSpacing(10)
+
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setWidgetResizable(True)
+        self.imageContainer = QWidget()
+        self.imageLayout = QVBoxLayout(self.imageContainer)
+        self.scrollArea.setWidget(self.imageContainer)
+
+        report_manager_layout.addWidget(self.scrollArea)
+
+        self.generatePdfButton = QPushButton("Generate PDF Report")
+        report_manager_layout.addWidget(self.generatePdfButton)
+
+        return report_manager_dock
+    
+    def detectionControlsDock(self):
+        detection_controls_container = QWidget()
+        detection_controls_layout = QHBoxLayout(detection_controls_container)
+        detection_controls_layout.setContentsMargins(10, 10, 10, 10)
+        detection_controls_layout.setSpacing(10)
+
+        self.filterCombo = QComboBox()
+        self.filterCombo.addItems(["cheating", "not_cheating"])
+        detection_controls_layout.addWidget(QLabel("Filter By:"))
+        detection_controls_layout.addWidget(self.filterCombo)
+
+        self.displayModeCombo = QComboBox()
+        self.displayModeCombo.addItems(["draw_labels", "draw_confidence"])
+        detection_controls_layout.addWidget(QLabel("Display Mode:"))
+        detection_controls_layout.addWidget(self.displayModeCombo)
+
+        self.startDetectionButton = QPushButton("Start Detection")
+        detection_controls_layout.addWidget(self.startDetectionButton)
+
+        self.confidenceSlider = QSlider(Qt.Horizontal)
+        self.confidenceSlider.setRange(0, 100)
+        self.confidenceSlider.setValue(50)
+        self.confidenceLabel = QLabel("50%")
+        detection_controls_layout.addWidget(QLabel("Confidence Threshold:"))
+        detection_controls_layout.addWidget(self.confidenceLabel)
+        detection_controls_layout.addWidget(self.confidenceSlider)
+
+        self.confidenceSlider.valueChanged.connect(self.update_confidence_label)
+
+        return detection_controls_container
+
+    def update_confidence_label(self, value):
+        self.confidenceLabel.setText(f"{value}%")
+
+    def setupStatusBar(self):
+        self.statusBar = QStatusBar()
+        self.setStatusBar(self.statusBar)
+
+        self.detectedObjectsLabel = QLabel("Detected Objects: 0")
+        self.statusBar.addWidget(self.detectedObjectsLabel)
+
+        self.internetStatusLabel = QLabel("Internet: Checking")
+        self.databaseStatusLabel = QLabel("Database: Checking")
+        self.statusBar.addPermanentWidget(self.internetStatusLabel)
+        self.statusBar.addPermanentWidget(self.databaseStatusLabel)
+
+        GUIManager.update_status(self.internetStatusLabel, self.databaseStatusLabel)
+
+    def setupTimers(self):
+        self.internetStatusTimer = QTimer(self)
+        self.internetStatusTimer.timeout.connect(lambda: GUIManager.update_internet_status(self.internetStatusLabel))
+        self.internetStatusTimer.start(1000)
+
+        self.databaseStatusTimer = QTimer(self)
+        self.databaseStatusTimer.timeout.connect(lambda: GUIManager.update_database_status(self.databaseStatusLabel))
+        self.databaseStatusTimer.start(1000)
+
+    def setupToolbar(self):
+        self.toolbar = QToolBar("Main Toolbar")
+        self.addToolBar(self.toolbar)
+
+        toggle_cnd_action = QAction("Toggle Camera & Display", self)
+        toggle_cnd_action.triggered.connect(self.toggleCameraDisplayDock)
+        self.toolbar.addAction(toggle_cnd_action)
+
+        toggle_dc_action = QAction("Toggle Detection Controls", self)
+        toggle_dc_action.triggered.connect(self.toggleDetectionControlsDock)
+        self.toolbar.addAction(toggle_dc_action)
+
+        toggle_rm_action = QAction("Toggle Captured Images Dock", self)
+        toggle_rm_action.triggered.connect(self.toggleReportManagerDock)
+        self.toolbar.addAction(toggle_rm_action)
+
+    def toggleCameraDisplayDock(self):
+        self.previewDock.setVisible(not self.previewDock.isVisible())
+
+    def toggleDetectionControlsDock(self):
+        self.controlsDock.setVisible(not self.controlsDock.isVisible())
+
+    def toggleReportManagerDock(self):
+        self.reportDock.setVisible(not self.reportDock.isVisible())
+
+    def toggle_camera(self):
+        self.camera_manager.toggle_camera()
+
+    def toggle_detection(self):
+        self.detection_manager.toggle_detection()
+
+    def update_display(self, frame):
+        GUIManager.display_frame(frame, self.displayLabel)
+
+    def update_detections(self, detections):
+        self.detectedObjectsLabel.setText(f"Detected Objects: {len(detections)}")
+        GUIManager.display_predictions(detections, self.imageLayout)
+    
+    def closeEvent(self, event):
+        reply = QMessageBox.question(self, 'Exit Confirmation',
+                                    "Are you sure you want to exit?",
+                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            GUIManager.clear_temp_images()
+            event.accept()
+        else:
+            event.ignore()
+
+class CameraManager(QObject):
+    frame_ready = pyqtSignal(object)
+
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
         self.camera_active = False
         self.cap = None
         self.current_image = None
         self.camera_devices = self.list_cameras()
-        self.selected_camera = tk.StringVar(root, value=self.camera_devices[0] if self.camera_devices else '')
-        self.stop_event = threading.Event()
-
+        self.selected_camera = self.camera_devices[0] if self.camera_devices else ''
+        self.camera_thread = None
+    
     def list_cameras(self):
         graph = FilterGraph()
-        return graph.get_input_devices()
+        devices = graph.get_input_devices()
+        self.main_window.cameraCombo.addItems(devices)
+        return devices
 
     def toggle_camera(self):
         self.camera_active = not self.camera_active
-        btn_camera.config(text="Stop Camera" if self.camera_active else "Start Camera")
         if self.camera_active:
+            self.main_window.startCameraButton.setText("Stop Camera")
             self.use_camera()
         else:
+            self.main_window.startCameraButton.setText("Start Camera")
             self.stop_camera()
 
     def use_camera(self):
-        camera_index = self.camera_devices.index(self.selected_camera.get())
+        camera_index = self.camera_devices.index(self.selected_camera)
         self.cap = cv2.VideoCapture(camera_index)
         if self.cap.isOpened():
-            self.stop_event.clear()
-            thread_manager.start_thread("update_camera", self.update_camera)
+            self.camera_thread = QThread()
+            self.camera_thread.run = self.update_camera
+            self.camera_thread.start()
         else:
-            messagebox.showerror("Error", "Selected camera is not available.")
+            print("Selected camera is not available.")
 
     def stop_camera(self):
         self.camera_active = False
-        self.stop_event.set()
-        thread_manager.stop_thread("update_camera")
+        if self.camera_thread and self.camera_thread.isRunning():
+            self.camera_thread.quit()
+            self.camera_thread.wait()
         if self.cap and self.cap.isOpened():
             self.cap.release()
             self.cap = None
+        self.clear_display()
 
     def update_camera(self):
-        while not self.stop_event.is_set() and self.cap and self.cap.isOpened():
+        while self.camera_active and self.cap and self.cap.isOpened():
             ret, frame = self.cap.read()
             if ret:
                 self.current_image = frame
-                if root.winfo_exists():
-                    GUIManager.display_frame(frame)
-            time.sleep(1 / 60)
+                self.frame_ready.emit(frame)
+            QThread.msleep(16)
 
+    def clear_display(self):
+        self.main_window.displayLabel.clear()
+        self.main_window.displayLabel.setStyleSheet("background-color: black; border: 2px solid #444444;")
 
-class DetectionManager:
-    def __init__(self, model):
+class DetectionManager(QObject):
+    detections_ready = pyqtSignal(list)
+
+    def __init__(self, model, main_window):
+        super().__init__()
         self.detection_active = False
         self.model = model
         self.detections = []
-        self.stop_event = threading.Event()
+        self.main_window = main_window
+        self.detection_thread = None
 
     def toggle_detection(self):
         self.detection_active = not self.detection_active
-        btn_toggle_detection.config(text="Stop Detection" if self.detection_active else "Start Detection", bg=accent_color)
         if self.detection_active:
-            self.stop_event.clear()
-            thread_manager.start_thread("process_camera_feed", self.process_camera_feed)
+            self.main_window.startDetectionButton.setText("Stop Detection")
+            self.detection_thread = QThread()
+            self.detection_thread.run = self.process_camera_feed
+            self.detection_thread.start()
         else:
+            self.main_window.startDetectionButton.setText("Start Detection")
             self.stop_detection()
 
     def stop_detection(self):
         self.detection_active = False
-        self.stop_event.set()
-        thread_manager.stop_thread("process_camera_feed")
+        if self.detection_thread and self.detection_thread.isRunning():
+            self.detection_thread.terminate()
+            self.detection_thread.wait()
 
     def process_camera_feed(self):
-        while not self.stop_event.is_set() and camera_manager.cap and camera_manager.cap.isOpened():
-            if camera_manager.current_image is not None:
-                self.detections = self.process_image(camera_manager.current_image)
-            time.sleep(1)
+        while self.detection_active and window.camera_manager.cap and window.camera_manager.cap.isOpened():
+            if window.camera_manager.current_image is not None:
+                self.detections = self.process_image(window.camera_manager.current_image)
+                self.detections_ready.emit(self.detections)
+            QThread.msleep(1000)
 
     def process_image(self, image):
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        confidence_threshold = confidence_slider.get()
+        confidence_threshold = window.confidenceSlider.value()
         try:
             result = self.model.predict(image_rgb, confidence=confidence_threshold, overlap=30).json()
-            num_objects = len(result['predictions'])
-            label.config(text=f"Detected Objects: {num_objects}")
-            GUIManager.display_predictions(result['predictions'])
             return result['predictions']
         except requests.exceptions.ConnectionError:
-            messagebox.showwarning("Connection Error", "An error occurred while attempting a connection. Retrying.")
-            time.sleep(3)
+            print("Connection Error. Retrying.")
+            QThread.sleep(3)
             return self.process_image(image)
-
 
 class PDFReport(FPDF):
     def header(self):
@@ -129,61 +362,54 @@ class PDFReport(FPDF):
 
     @staticmethod
     def prompt_report_details():
-        def on_submit():
-            nonlocal proctor, block, date, subject, room, start, end
-            proctor = entry_proctor.get()
-            block = entry_block.get()
-            date = entry_date.get_date().strftime('%Y-%m-%d')
-            subject = entry_subject.get()
-            room = entry_room.get()
-            start = entry_start.get()
-            end = entry_end.get()
-            dialog.destroy()
+        dialog = QDialog()
+        dialog.setWindowTitle("Report Details")
+        layout = QVBoxLayout(dialog)
 
-        root = tk.Tk()
-        root.withdraw()
-
-        dialog = tk.Toplevel(root)
-        dialog.title("Report Details")
-
-        def create_label_entry(dialog, text, row):
-            tk.Label(dialog, text=text).grid(row=row, column=0, padx=5, pady=5)
-            entry = tk.Entry(dialog)
-            entry.grid(row=row, column=1, padx=5, pady=5)
+        def create_label_entry(text):
+            label = QLabel(text)
+            entry = QLineEdit()
+            layout.addWidget(label)
+            layout.addWidget(entry)
             return entry
 
-        entry_proctor = create_label_entry(dialog, "Proctor's Name:", 0)
-        entry_block = create_label_entry(dialog, "block:", 1)
-        entry_date = DateEntry(dialog, date_pattern='y-mm-dd')
-        entry_date.grid(row=2, column=1, padx=5, pady=5)
-        tk.Label(dialog, text="Exam Date:").grid(row=2, column=0, padx=5, pady=5)
-        entry_subject = create_label_entry(dialog, "subject:", 3)
-        entry_room = create_label_entry(dialog, "room:", 4)
-        entry_start = ttk.Combobox(dialog, values=[f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
-        entry_start.grid(row=5, column=1, padx=5, pady=5)
-        tk.Label(dialog, text="Start Time:").grid(row=5, column=0, padx=5, pady=5)
-        entry_end = ttk.Combobox(dialog, values=[f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
-        entry_end.grid(row=6, column=1, padx=5, pady=5)
-        tk.Label(dialog, text="End Time:").grid(row=6, column=0, padx=5, pady=5)
+        entry_proctor = create_label_entry("Proctor's Name:")
+        entry_block = create_label_entry("Block:")
+        entry_date = QDateEdit(calendarPopup=True)
+        entry_date.setDate(QDate.currentDate())
+        layout.addWidget(QLabel("Exam Date:"))
+        layout.addWidget(entry_date)
+        entry_subject = create_label_entry("Subject:")
+        entry_room = create_label_entry("Room:")
+        entry_start = QComboBox()
+        entry_start.addItems([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
+        layout.addWidget(QLabel("Start Time:"))
+        layout.addWidget(entry_start)
+        entry_end = QComboBox()
+        entry_end.addItems([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
+        layout.addWidget(QLabel("End Time:"))
+        layout.addWidget(entry_end)
 
-        submit_button = tk.Button(dialog, text="Submit", command=on_submit)
-        submit_button.grid(row=7, columnspan=2)
+        submit_button = QPushButton("Submit")
+        layout.addWidget(submit_button)
 
-        proctor = block = date = subject = room = start = end = None
-        root.wait_window(dialog)
+        def on_submit():
+            dialog.accept()
 
-        return proctor, block, date, subject, room, start, end
+        submit_button.clicked.connect(on_submit)
+        dialog.exec_()
+
+        return (entry_proctor.text(), entry_block.text(), entry_date.date().toString("yyyy-MM-dd"),
+                entry_subject.text(), entry_room.text(), entry_start.currentText(), entry_end.currentText())
 
     @staticmethod
     def save_pdf():
         proctor, block, date, subject, room, start, end = PDFReport.prompt_report_details()
         if not all([proctor, block, date, subject, room, start, end]):
-            messagebox.showerror("Error", "All fields must be filled out.")
+            print("All fields must be filled out.")
             return
 
-        db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
-
-        pdf_filename = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
+        pdf_filename, _ = QFileDialog.getSaveFileName(None, "Save PDF", "", "PDF files (*.pdf)")
         if not pdf_filename:
             return
 
@@ -195,13 +421,13 @@ class PDFReport(FPDF):
         image_count = 0
         x_positions = [10, 110]
         y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
-    
+
         for filename in os.listdir("tempcaptures"):
             if filename.endswith(".jpg"):
                 if image_count > 0 and image_count % 4 == 0:
                     pdf.add_page()
                     y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
-    
+
                 image_path = os.path.join("tempcaptures", filename)
                 x = x_positions[image_count % 2]
                 y = y_positions[(image_count // 2) % 2]
@@ -209,31 +435,29 @@ class PDFReport(FPDF):
                 image_count += 1
 
         pdf.output(pdf_filename)
-        messagebox.showinfo("PDF Saved", f"PDF saved as {pdf_filename}")
-        GUIManager.clear_temp_images()
+        print(f"PDF saved as {pdf_filename}")
 
+        db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
+
+        GUIManager.clear_temp_images()
 
 class GUIManager:
     @staticmethod
     def update_status(internet_status_label, database_status_label):
-        if not internet_status_label.winfo_exists() or not database_status_label.winfo_exists():
-            return
-
         GUIManager.update_internet_status(internet_status_label)
         GUIManager.update_database_status(database_status_label)
-        GUIManager.schedule_database_status_update(database_status_label)
 
     @staticmethod
     def update_internet_status(internet_status_label):
         internet_status = "Connected" if GUIManager.check_internet_connection() else "Disconnected"
-        internet_status_label.config(text=f"Internet: {internet_status}")
+        internet_status_label.setText(f"Internet: {internet_status}")
 
     @staticmethod
     def update_database_status(database_status_label):
         if db_manager.connection is None or not db_manager.connection.is_connected():
             db_manager.connect()
         database_status = "Connected" if db_manager.connection and db_manager.connection.is_connected() else "Disconnected"
-        database_status_label.config(text=f"Database: {database_status}")
+        database_status_label.setText(f"Database: {database_status}")
 
     @staticmethod
     def check_internet_connection():
@@ -242,14 +466,6 @@ class GUIManager:
             return True
         except requests.ConnectionError:
             return False
-
-    @staticmethod
-    def schedule_database_status_update(database_status_label):
-        def update():
-            GUIManager.update_database_status(database_status_label)
-            database_status_label.after(3000, update)
-        
-        update()
 
     @staticmethod
     def create_temp_folder():
@@ -279,22 +495,29 @@ class GUIManager:
 
         cv2.imwrite(image_filename, cheating_image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
-        history_text.insert(tk.END, f"Cheating detected at {timestamp}. Saved to {image_filename}\n")
+        print(f"Cheating detected at {timestamp}. Saved to {image_filename}")
 
     @staticmethod
     def clear_temp_images():
-        shutil.rmtree("tempcaptures")
-        os.makedirs("tempcaptures")
-        history_text.delete(1.0, tk.END)
-        messagebox.showinfo("Images Cleared", "All temporary images have been cleared.")
+        folder = "tempcaptures"
+        if os.path.exists(folder):
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f'Failed to delete {file_path}. Reason: {e}')
 
     @staticmethod
-    def display_frame(frame):
+    def display_frame(frame, display_label):
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        for detection in detection_manager.detections:
-            if detection['class'] == label_filter.get():
+        for detection in window.detection_manager.detections:
+            if detection['class'] == window.filterCombo.currentText():
                 GUIManager.draw_bounding_box(image_rgb, detection)
-        GUIManager.update_canvas(image_rgb)
+        GUIManager.update_canvas(image_rgb, display_label)
 
     @staticmethod
     def draw_bounding_box(image, detection):
@@ -311,7 +534,7 @@ class GUIManager:
         color = (0, 255, 0) if class_name == "not_cheating" else (255, 0, 0)
 
         cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
-        label_text = class_name if display_mode.get() == "draw_labels" else f"{confidence:.2f}%"
+        label_text = class_name if window.displayModeCombo.currentText() == "draw_labels" else f"{confidence:.2f}%"
         GUIManager.put_text(image, label_text, x0, y0, color)
 
     @staticmethod
@@ -322,163 +545,34 @@ class GUIManager:
         cv2.putText(image, text, (text_x, text_y + text_size[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
     @staticmethod
-    def update_canvas(image_rgb):
-        canvas_width = canvas.winfo_width()
-        canvas_height = canvas.winfo_height()
-        image_pil = Image.fromarray(image_rgb)
-
-        image_aspect = image_pil.width / image_pil.height
-        canvas_aspect = canvas_width / canvas_height
-
-        if image_aspect > canvas_aspect:
-            new_width = canvas_width
-            new_height = int(canvas_width / image_aspect)
-        else:
-            new_height = canvas_height
-            new_width = int(canvas_height * image_aspect)
-
-        image_pil = image_pil.resize((new_width, new_height), Image.LANCZOS)
-        image_tk = ImageTk.PhotoImage(image_pil)
-
-        canvas.create_image((canvas_width - new_width) // 2, (canvas_height - new_height) // 2, anchor=tk.NW, image=image_tk)
-        canvas.image = image_tk
+    def update_canvas(image_rgb, display_label):
+        height, width = image_rgb.shape[:2]
+        bytes_per_line = 3 * width
+        q_image = QImage(image_rgb.data, width, height, bytes_per_line, QImage.Format_RGB888)
+        display_label.setPixmap(QPixmap.fromImage(q_image))
 
     @staticmethod
-    def display_predictions(predictions):
-        predictions_text.delete(1.0, tk.END)
+    def display_predictions(predictions, predictions_layout):
+        fixed_width = 150
+        fixed_height = 150
+
         for detection in predictions:
-            predictions_text.insert(tk.END, f"Class: {detection['class']}, Confidence: {detection['confidence']:.2f}%, "
-                                            f"X: {detection['x']}, Y: {detection['y']}, Width: {detection['width']}, "
-                                            f"Height: {detection['height']}\n")
             if detection['class'] == "cheating":
-                GUIManager.capture_cheating_image(detection, camera_manager.current_image)
-
-
-class ThreadManager:
-    def __init__(self):
-        self.executor = ThreadPoolExecutor(max_workers=5)
-        self.futures = {}
-
-    def start_thread(self, name, target, args=()):
-        if name in self.futures and not self.futures[name].done():
-            print(f"Thread {name} is already running.")
-            return
-        future = self.executor.submit(target, *args)
-        self.futures[name] = future
-        print(f"Thread {name} started.")
-
-    def stop_thread(self, name):
-        if name in self.futures and not self.futures[name].done():
-            self.futures[name].cancel()
-            print(f"Thread {name} stopped.")
-        else:
-            print(f"Thread {name} is not running.")
-
-    def stop_all_threads(self):
-        for name, future in self.futures.items():
-            if not future.done():
-                future.cancel()
-                print(f"Thread {name} stopped.")
-
-    def is_thread_running(self, name):
-        return name in self.futures and not self.futures[name].done()
-
-
-def initialize_roboflow():
-    rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
-    project = rf.workspace().project("giam_sat_gian_lan")
-    return project.version(2).model
-
+                GUIManager.capture_cheating_image(detection, window.camera_manager.current_image)
+                image_label = QLabel()
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                image_path = f"tempcaptures/cheating_{timestamp}.jpg"
+                pixmap = QPixmap(image_path)
+                pixmap = pixmap.scaled(fixed_width, fixed_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                image_label.setPixmap(pixmap)
+                image_label.setFixedSize(fixed_width, fixed_height)
+                image_label.setAlignment(Qt.AlignCenter)
+                predictions_layout.addWidget(image_label, alignment=Qt.AlignCenter)
 
 if __name__ == "__main__":
-    model = initialize_roboflow()
-    db_manager = dbc.DatabaseManager()
-
-    root = tk.Tk()
-    root.title("ProctorAI")
-
-    dark_bg = "#2b2b2b"
-    dark_fg = "#e0e0e0"
-    accent_color = "#007acc"
-    root.configure(bg=dark_bg)
-
-    thread_manager = ThreadManager()
-    camera_manager = CameraManager(root)
-    detection_manager = DetectionManager(model)
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    window = MainWindow()
     
-    GUIManager.create_temp_folder()
-
-    frame = tk.Frame(root, bg=dark_bg)
-    frame.pack(fill=tk.BOTH, expand=True)
-
-    canvas = tk.Canvas(frame, bg=dark_bg, highlightthickness=0)
-    canvas.pack(fill=tk.BOTH, expand=True)
-
-    controls_frame = tk.Frame(root, bg=dark_bg)
-    controls_frame.pack(side=tk.BOTTOM, fill=tk.X)
-
-    def create_label_and_widget(frame, label_text, widget_class, widget_var, values, side=tk.LEFT):
-        tk.Label(frame, text=label_text, fg=dark_fg, bg=dark_bg).pack(side=side)
-        widget = widget_class(frame, textvariable=widget_var, values=values)
-        widget.pack(side=side, padx=5, pady=5)
-        return widget
-
-    create_label_and_widget(controls_frame, "Select Camera:", ttk.Combobox, camera_manager.selected_camera, camera_manager.camera_devices)
-    btn_camera = tk.Button(controls_frame, text="Start Camera", command=camera_manager.toggle_camera, bg=accent_color, fg="white")
-    btn_camera.pack(side=tk.LEFT)
-
-    label_filter = tk.StringVar(value="cheating")
-    create_label_and_widget(controls_frame, "Filter By:", ttk.Combobox, label_filter, ["cheating", "not_cheating"])
-
-    display_mode = tk.StringVar(value="draw_labels")
-    create_label_and_widget(controls_frame, "Display Mode:", ttk.Combobox, display_mode, ["draw_labels", "draw_confidence"])
-
-    btn_toggle_detection = tk.Button(controls_frame, text="Start Detection", command=detection_manager.toggle_detection, bg=accent_color, fg="white")
-    btn_toggle_detection.pack(side=tk.LEFT)
-
-    confidence_label = tk.Label(controls_frame, text="Confidence Threshold:", fg=dark_fg, bg=dark_bg)
-    confidence_label.pack(side=tk.LEFT)
-    confidence_slider = tk.Scale(controls_frame, from_=0, to=100, orient=tk.HORIZONTAL, bg=dark_bg, fg=dark_fg)
-    confidence_slider.pack(side=tk.LEFT)
-
-    btn_clear_images = tk.Button(controls_frame, text="Clear Images History", command=GUIManager.clear_temp_images, bg=accent_color, fg="white")
-    btn_clear_images.pack(side=tk.LEFT)
-
-    btn_save_pdf = tk.Button(controls_frame, text="Generate PDF Report", command=PDFReport.save_pdf, bg=accent_color, fg="white")
-    btn_save_pdf.pack(side=tk.LEFT)
-
-    predictions_text = ScrolledText(root, height=5, bg=dark_bg, fg=dark_fg)
-    predictions_text.pack(fill=tk.X, padx=10, pady=5)
-
-    history_text = ScrolledText(root, height=5, bg=dark_bg, fg=dark_fg)
-    history_text.pack(fill=tk.X, padx=10, pady=5)
-
-    label = tk.Label(root, text="Detected Objects: 0", bg=dark_bg, fg=dark_fg)
-    label.pack(fill=tk.X)
-
-    status_frame = tk.Frame(root, bg=dark_bg)
-    status_frame.pack(side=tk.BOTTOM, fill=tk.X)
-    
-    status_labels_frame = tk.Frame(status_frame)
-    status_labels_frame.pack()
-
-    internet_status_label = tk.Label(status_labels_frame, text="Internet: Checking", bg=dark_bg, fg=dark_fg)
-    internet_status_label.pack(side=tk.LEFT)
-
-    database_status_label = tk.Label(status_labels_frame, text="Database: Checking", bg=dark_bg, fg=dark_fg)
-    database_status_label.pack(side=tk.LEFT)
-
-    thread_manager.start_thread("update_status", GUIManager.update_status, args=(internet_status_label, database_status_label))
-
-    def on_exit():
-        if messagebox.askokcancel("Quit", "Do you really wish to quit?"):
-            detection_manager.stop_detection()
-            camera_manager.stop_camera()
-            thread_manager.stop_all_threads()
-            thread_manager.stop_thread("update_status")
-            GUIManager.clear_temp_images()
-            root.after(3000, root.quit)
-
-    root.protocol("WM_DELETE_WINDOW", on_exit)
-    root.mainloop()
-
+    window.show()
+    sys.exit(app.exec_())

@@ -1,8 +1,7 @@
-pillow
-opencv-python
+PyQt5
 roboflow
-fpdf
-tkcalendar
 pygrabber
+opencv-python
 requests
+fpdf
 mysql-connector-python
