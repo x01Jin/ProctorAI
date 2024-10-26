@@ -16,7 +16,7 @@ import requests
 import dbc
 from concurrent.futures import ThreadPoolExecutor
 
-#sdasdasdasd
+
 class CameraManager:
     def __init__(self, root):
         self.camera_active = False
@@ -102,10 +102,9 @@ class DetectionManager:
             GUIManager.display_predictions(result['predictions'])
             return result['predictions']
         except requests.exceptions.ConnectionError:
-            messagebox.showerror("Connection Error", "An error occurred while attempting a connection. Please retry.")
-            btn_toggle_detection.config(text="Retry", bg="red")
-            self.detection_active = False
-            return []
+            messagebox.showwarning("Connection Error", "An error occurred while attempting a connection. Retrying.")
+            time.sleep(3)
+            return self.process_image(image)
 
 
 class PDFReport(FPDF):
