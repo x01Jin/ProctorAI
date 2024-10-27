@@ -258,10 +258,10 @@ class CameraManager(QObject):
     def toggle_camera(self):
         self.camera_active = not self.camera_active
         if self.camera_active:
-            self.main_window.startCameraButton.setText("Start Camera")
+            self.main_window.startCameraButton.setText("Stop Camera")
             self.use_camera()
         else:
-            self.main_window.startCameraButton.setText("Stop Camera")
+            self.main_window.startCameraButton.setText("Start Camera")
             self.stop_camera()
 
     def use_camera(self):
@@ -411,8 +411,10 @@ class PDFReport(FPDF):
     def save_pdf():
         proctor, block, date, subject, room, start, end = PDFReport.prompt_report_details()
         if not all([proctor, block, date, subject, room, start, end]):
-            print("All fields must be filled out.")
+            QMessageBox.critical(None, "Error", "All fields must be filled out.")
             return
+
+        db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
 
         desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
         pdf_filename, _ = QFileDialog.getSaveFileName(None, "Save PDF", desktop_path, "PDF files (*.pdf)")
@@ -440,11 +442,9 @@ class PDFReport(FPDF):
                 pdf.image(image_path, x=x, y=y, w=90, h=90)
                 image_count += 1
 
-        db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
-
+        pdf.output(pdf_filename)
+        QMessageBox.information(None, "PDF Saved", f"PDF saved as {pdf_filename}")
         GUIManager.clear_temp_images()
-
-        QMessageBox.information(None, "PDF Report", f"Report saved in {pdf_filename}")
 
 class GUIManager:
     @staticmethod
@@ -578,6 +578,9 @@ class GUIManager:
                 predictions_layout.addWidget(image_label, alignment=Qt.AlignCenter)
 
 if __name__ == "__main__":
+    if not os.path.exists("tempcaptures"):
+        os.makedirs("tempcaptures")
+    
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     window = MainWindow()
