@@ -151,8 +151,8 @@ class MainWindow(QMainWindow):
 
         self.confidenceSlider = QSlider(Qt.Horizontal)
         self.confidenceSlider.setRange(0, 100)
-        self.confidenceSlider.setValue(50)
-        self.confidenceLabel = QLabel("50%")
+        self.confidenceSlider.setValue(10)
+        self.confidenceLabel = QLabel("10%")
         detection_controls_layout.addWidget(QLabel("Confidence Threshold:"))
         detection_controls_layout.addWidget(self.confidenceLabel)
         detection_controls_layout.addWidget(self.confidenceSlider)
@@ -357,11 +357,11 @@ class PDFReport(FPDF):
     def body(self, proctor, block, date, subject, room, start, end):
         self.set_font("Arial", 'B', 12)
         self.cell(120, 7, f"Name: {proctor}", ln=False)
-        self.cell(0, 7, f"Time: {datetime.now().strftime('%H:%M:%S')}", ln=True)
+        self.cell(0, 7, f"Time Generated: {datetime.now().strftime('%H:%M:%S')}", ln=True)
         self.cell(120, 7, f"Exam Date: {date}", ln=False)
-        self.cell(0, 7, f"subject: {subject}", ln=True)
-        self.cell(120, 7, f"block: {block}", ln=False)
-        self.cell(0, 7, f"room: {room}", ln=True)
+        self.cell(0, 7, f"Subject: {subject}", ln=True)
+        self.cell(120, 7, f"Block: {block}", ln=False)
+        self.cell(0, 7, f"Room: {room}", ln=True)
         self.cell(120, 7, f"Start Time: {start}", ln=False)
         self.cell(0, 7, f"End Time: {end}", ln=True)
 
@@ -416,7 +416,7 @@ class PDFReport(FPDF):
 
         db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
 
-        desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Report')
         pdf_filename, _ = QFileDialog.getSaveFileName(None, "Save PDF", desktop_path, "PDF files (*.pdf)")
         if not pdf_filename:
             return
