@@ -16,10 +16,19 @@ from datetime import datetime
 import requests
 from fpdf import FPDF
 
+MODEL_CLASSES = ["cheating", "not_cheating"]
+
 def initialize_roboflow():
-    rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
-    project = rf.workspace().project("giam_sat_gian_lan")
-    return project.version(2).model
+    try:
+        rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
+        project = rf.workspace().project("giam_sat_gian_lan")
+        model = project.version(2).model
+        classes = MODEL_CLASSES
+        return model, classes
+    except Exception as e:
+        print(f"Error initializing Roboflow: {e}")
+        return None, []
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -36,8 +45,15 @@ class MainWindow(QMainWindow):
         self.setupTimers()
         self.setupToolbar()
 
+        model, classes = initialize_roboflow()
+        if model is None:
+            QMessageBox.critical(self, "Error", "Failed to initialize Roboflow model.")
+            sys.exit(1)
+
         self.camera_manager = CameraManager(self)
-        self.detection_manager = DetectionManager(initialize_roboflow(), self)
+        self.detection_manager = DetectionManager(model, self)
+
+        self.populate_filter_selection(classes)
 
         self.camera_manager.frame_ready.connect(self.update_display)
         self.detection_manager.detections_ready.connect(self.update_detections)
@@ -45,6 +61,14 @@ class MainWindow(QMainWindow):
         self.startCameraButton.clicked.connect(self.toggle_camera)
         self.startDetectionButton.clicked.connect(self.toggle_detection)
         self.generatePdfButton.clicked.connect(PDFReport.save_pdf)
+
+    def populate_filter_selection(self, classes):
+        self.filterCombo.clear()
+        self.filterCombo.addItem("All")
+        if classes:
+            self.filterCombo.addItems(classes)
+        else:
+            self.filterCombo.addItems(["No classes available"])
         
     def setupDarkPallete(self):
         dark_pallete = QPalette()
@@ -137,9 +161,13 @@ class MainWindow(QMainWindow):
         detection_controls_layout.setSpacing(10)
 
         self.filterCombo = QComboBox()
-        self.filterCombo.addItems(["cheating", "not_cheating"])
         detection_controls_layout.addWidget(QLabel("Filter By:"))
         detection_controls_layout.addWidget(self.filterCombo)
+
+        self.captureClassCombo = QComboBox()
+        self.captureClassCombo.addItems(MODEL_CLASSES)
+        detection_controls_layout.addWidget(QLabel("Capture:"))
+        detection_controls_layout.addWidget(self.captureClassCombo)
 
         self.displayModeCombo = QComboBox()
         self.displayModeCombo.addItems(["draw_labels", "draw_confidence"])
@@ -160,6 +188,10 @@ class MainWindow(QMainWindow):
         self.confidenceSlider.valueChanged.connect(self.update_confidence_label)
 
         return detection_controls_container
+    
+    def get_selected_capture_class(self):
+        selected_class = self.captureClassCombo.currentText()
+        return selected_class
 
     def update_confidence_label(self, value):
         self.confidenceLabel.setText(f"{value}%")
@@ -223,7 +255,7 @@ class MainWindow(QMainWindow):
 
     def update_detections(self, detections):
         self.detectedObjectsLabel.setText(f"Detected Objects: {len(detections)}")
-        GUIManager.display_predictions(detections, self.imageLayout)
+        GUIManager.display_captures(detections, self.imageLayout)
     
     def closeEvent(self, event):
         reply = QMessageBox.question(self, 'Exit Confirmation',
@@ -231,10 +263,11 @@ class MainWindow(QMainWindow):
                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
         if reply == QMessageBox.Yes:
-            GUIManager.clear_temp_images()
+            GUIManager.cleanup()
             event.accept()
         else:
             event.ignore()
+
 
 class CameraManager(QObject):
     frame_ready = pyqtSignal(object)
@@ -249,11 +282,16 @@ class CameraManager(QObject):
         self.selected_camera = self.camera_devices[0] if self.camera_devices else ''
         self.camera_thread = None
 
+        self.main_window.cameraCombo.currentIndexChanged.connect(self.on_camera_selected)
+
     def list_cameras(self):
         graph = FilterGraph()
         devices = graph.get_input_devices()
         self.main_window.cameraCombo.addItems(devices)
         return devices
+
+    def on_camera_selected(self, index):
+        self.selected_camera = self.camera_devices[index]
 
     def toggle_camera(self):
         self.camera_active = not self.camera_active
@@ -298,6 +336,7 @@ class CameraManager(QObject):
 
     def __del__(self):
         self.stop_camera()
+
 
 class DetectionManager(QObject):
     detections_ready = pyqtSignal(list)
@@ -344,6 +383,7 @@ class DetectionManager(QObject):
             print("Connection Error. Retrying.")
             QThread.sleep(3)
             return self.process_image(image)
+
 
 class PDFReport(FPDF):
     def header(self):
@@ -444,7 +484,8 @@ class PDFReport(FPDF):
 
         pdf.output(pdf_filename)
         QMessageBox.information(None, "PDF Saved", f"PDF saved as {pdf_filename}")
-        GUIManager.clear_temp_images()
+        GUIManager.cleanup()
+
 
 class GUIManager:
     @staticmethod
@@ -478,7 +519,11 @@ class GUIManager:
             os.makedirs("tempcaptures")
 
     @staticmethod
-    def capture_cheating_image(detection, current_image):
+    def capture_image(detection, current_image):
+        selected_class = window.get_selected_capture_class()
+        if detection['class'] != selected_class:
+            return
+
         x_center, y_center = detection['x'], detection['y']
         width, height = int(detection['width'] * 1.5), int(detection['height'] * 1.5)
         x0, y0 = int(x_center - width / 2), int(y_center - height / 2)
@@ -489,19 +534,19 @@ class GUIManager:
         x1 = min(current_image.shape[1], x1)
         y1 = min(current_image.shape[0], y1)
 
-        cheating_image = current_image[y0:y1, x0:x1]
+        image = current_image[y0:y1, x0:x1]
 
-        if cheating_image.size == 0:
+        if image.size == 0:
             print(f"Invalid crop: x0={x0}, y0={y0}, x1={x1}, y1={y1}, image_shape={current_image.shape}")
             return
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         image_filename = f"tempcaptures/cheating_{timestamp}.jpg"
 
-        cv2.imwrite(image_filename, cheating_image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+        cv2.imwrite(image_filename, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
     @staticmethod
-    def clear_temp_images():
+    def cleanup():
         folder = "tempcaptures"
         if os.path.exists(folder):
             for filename in os.listdir(folder):
@@ -522,8 +567,9 @@ class GUIManager:
     @staticmethod
     def display_frame(frame, display_label):
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        selected_filter = window.filterCombo.currentText()
         for detection in window.detection_manager.detections:
-            if detection['class'] == window.filterCombo.currentText():
+            if selected_filter == "All" or detection['class'] == selected_filter:
                 GUIManager.draw_bounding_box(image_rgb, detection)
         GUIManager.update_canvas(image_rgb, display_label)
 
@@ -560,13 +606,13 @@ class GUIManager:
         display_label.setPixmap(QPixmap.fromImage(q_image))
 
     @staticmethod
-    def display_predictions(predictions, predictions_layout):
+    def display_captures(predictions, captures_layout):
         fixed_width = 150
         fixed_height = 150
 
         for detection in predictions:
-            if detection['class'] == "cheating":
-                GUIManager.capture_cheating_image(detection, window.camera_manager.current_image)
+            if detection['class'] == window.get_selected_capture_class():
+                GUIManager.capture_image(detection, window.camera_manager.current_image)
                 image_label = QLabel()
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 image_path = f"tempcaptures/cheating_{timestamp}.jpg"
@@ -575,7 +621,8 @@ class GUIManager:
                 image_label.setPixmap(pixmap)
                 image_label.setFixedSize(fixed_width, fixed_height)
                 image_label.setAlignment(Qt.AlignCenter)
-                predictions_layout.addWidget(image_label, alignment=Qt.AlignCenter)
+                captures_layout.insertWidget(0, image_label, alignment=Qt.AlignCenter)
+
 
 if __name__ == "__main__":
     if not os.path.exists("tempcaptures"):
