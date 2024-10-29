@@ -1,12 +1,8 @@
 import sys
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QComboBox, QSlider, QStatusBar, QDockWidget, 
-    QToolBar, QAction, QSplitter, QScrollArea, QDialog, QFileDialog, QLineEdit, QDateEdit, QMessageBox
-)
+from PyQt5.QtWidgets import *
 from roboflow import Roboflow
-from PyQt5.QtCore import Qt, pyqtSignal, QThread, QDate, QObject, QTimer
-from PyQt5.QtGui import QPalette, QColor, QPixmap, QImage
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 from pygrabber.dshow_graph import FilterGraph
 import cv2
 import os
@@ -340,6 +336,7 @@ class CameraManager(QObject):
 
 class DetectionManager(QObject):
     detections_ready = pyqtSignal(list)
+    connection_status_changed = pyqtSignal(bool)
 
     def __init__(self, model, main_window):
         super().__init__()
@@ -376,11 +373,20 @@ class DetectionManager(QObject):
     def process_image(self, image):
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         confidence_threshold = window.confidenceSlider.value()
+        
+        if not GUIManager.connection():
+            print("Connection Error. Retrying.")
+            self.connection_status_changed.emit(False)
+            QThread.sleep(3)
+            return self.process_image(image)
+        
         try:
             result = self.model.predict(image_rgb, confidence=confidence_threshold, overlap=30).json()
+            self.connection_status_changed.emit(True)
             return result['predictions']
         except requests.exceptions.ConnectionError:
             print("Connection Error. Retrying.")
+            self.connection_status_changed.emit(False)
             QThread.sleep(3)
             return self.process_image(image)
 
@@ -480,6 +486,10 @@ class PDFReport(FPDF):
                 x = x_positions[image_count % 2]
                 y = y_positions[(image_count // 2) % 2]
                 pdf.image(image_path, x=x, y=y, w=90, h=90)
+                pdf.set_font("Arial", size=8)
+                pdf.set_xy(x, y - 5)
+                filename_without_extension = os.path.splitext(filename)[0]
+                pdf.cell(90, 5, filename_without_extension, 0, 0, 'C')
                 image_count += 1
 
         pdf.output(pdf_filename)
@@ -495,7 +505,7 @@ class GUIManager:
 
     @staticmethod
     def update_internet_status(internet_status_label):
-        internet_status = "Connected" if GUIManager.check_internet_connection() else "Disconnected"
+        internet_status = "Connected" if GUIManager.connection() else "Disconnected"
         internet_status_label.setText(f"Internet: {internet_status}")
 
     @staticmethod
@@ -506,7 +516,7 @@ class GUIManager:
         database_status_label.setText(f"Database: {database_status}")
 
     @staticmethod
-    def check_internet_connection():
+    def connection():
         try:
             requests.get("http://www.google.com", timeout=3)
             return True
@@ -540,8 +550,11 @@ class GUIManager:
             print(f"Invalid crop: x0={x0}, y0={y0}, x1={x1}, y1={y1}, image_shape={current_image.shape}")
             return
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        image_filename = f"tempcaptures/cheating_{timestamp}.jpg"
+        existing_files = os.listdir("tempcaptures")
+        image_number = 1
+        while f"untagged({image_number}).jpg" in existing_files:
+            image_number += 1
+        image_filename = f"tempcaptures/untagged({image_number}).jpg"
 
         cv2.imwrite(image_filename, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
 
@@ -607,21 +620,104 @@ class GUIManager:
 
     @staticmethod
     def display_captures(predictions, captures_layout):
+        while captures_layout.count():
+            child = captures_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
         fixed_width = 150
         fixed_height = 150
 
-        for detection in predictions:
-            if detection['class'] == window.get_selected_capture_class():
-                GUIManager.capture_image(detection, window.camera_manager.current_image)
-                image_label = QLabel()
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                image_path = f"tempcaptures/cheating_{timestamp}.jpg"
+        for filename in os.listdir("tempcaptures"):
+            if filename.endswith(".jpg"):
+                image_path = os.path.join("tempcaptures", filename)
+                image_label = ImageLabel(image_path)
                 pixmap = QPixmap(image_path)
                 pixmap = pixmap.scaled(fixed_width, fixed_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 image_label.setPixmap(pixmap)
                 image_label.setFixedSize(fixed_width, fixed_height)
                 image_label.setAlignment(Qt.AlignCenter)
                 captures_layout.insertWidget(0, image_label, alignment=Qt.AlignCenter)
+
+        for detection in predictions:
+            if detection['class'] == window.get_selected_capture_class():
+                GUIManager.capture_image(detection, window.camera_manager.current_image)
+                existing_files = os.listdir("tempcaptures")
+                image_number = 1
+                while f"untagged({image_number}).jpg" in existing_files:
+                    image_number += 1
+                image_path = f"tempcaptures/untagged({image_number}).jpg"
+                if os.path.exists(image_path):
+                    image_label = ImageLabel(image_path)
+                    pixmap = QPixmap(image_path)
+                    pixmap = pixmap.scaled(fixed_width, fixed_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    image_label.setPixmap(pixmap)
+                    image_label.setFixedSize(fixed_width, fixed_height)
+                    image_label.setAlignment(Qt.AlignCenter)
+                    captures_layout.insertWidget(0, image_label, alignment=Qt.AlignCenter)
+
+
+class ImageLabel(QLabel):
+    def __init__(self, image_path, parent=None):
+        super().__init__(parent)
+        self.image_path = image_path
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+        self.tag = ""
+
+    def show_context_menu(self, pos):
+        context_menu = QMenu(self)
+        delete_action = context_menu.addAction("Delete")
+        edit_tag_action = context_menu.addAction("Edit Tag")
+        action = context_menu.exec_(self.mapToGlobal(pos))
+        if action == delete_action:
+            self.delete_image()
+        elif action == edit_tag_action:
+            self.add_tag()
+
+    def delete_image(self):
+        os.remove(self.image_path)
+        self.deleteLater()
+
+    def add_tag(self):
+        tag, ok = QInputDialog.getText(self, "Add Tag", "Enter tag:")
+        if ok and tag:
+            if self.is_valid_tag(tag):
+                self.tag = tag
+                self.setToolTip(tag)
+                self.update()
+                self.update_filename_with_tag()
+            else:
+                QMessageBox.critical(self, "Invalid Tag", "The tag contains invalid characters.")
+    
+    def redo_tag(self):
+        self.add_tag()
+
+    def is_valid_tag(self, tag):
+        invalid_chars = r'<>:"/\|?*'
+        return not any(char in invalid_chars for char in tag)
+
+    def update_filename_with_tag(self):
+        directory, original_filename = os.path.split(self.image_path)
+        _, ext = os.path.splitext(original_filename)
+        new_filename = f"{self.tag}{ext}"
+        new_filepath = os.path.join(directory, new_filename)
+
+        counter = 1
+        while os.path.exists(new_filepath):
+            new_filename = f"{self.tag}_{counter}{ext}"
+            new_filepath = os.path.join(directory, new_filename)
+            counter += 1
+
+        os.rename(self.image_path, new_filepath)
+        self.image_path = new_filepath
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.toolTip():
+            painter = QPainter(self)
+            painter.setPen(Qt.red)
+            painter.drawText(self.rect(), Qt.AlignTop | Qt.AlignHCenter, self.toolTip())
 
 
 if __name__ == "__main__":
