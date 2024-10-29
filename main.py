@@ -588,13 +588,11 @@ class GUIManager:
 
     @staticmethod
     def draw_bounding_box(image, detection):
-        fixed_width = 151
-        fixed_height = 151
-
         x_center, y_center = detection['x'], detection['y']
+        width, height = detection['width'], detection['height']
 
-        x0, y0 = int(x_center - fixed_width / 2), int(y_center - fixed_height / 2)
-        x1, y1 = int(x_center + fixed_width / 2), int(y_center + fixed_height / 2)
+        x0, y0 = int(x_center - width / 2), int(y_center - height / 2)
+        x1, y1 = int(x_center + width / 2), int(y_center + height / 2)
 
         class_name = detection['class']
         confidence = detection['confidence']
