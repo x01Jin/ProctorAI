@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ProctorAI")
         self.setGeometry(100, 100, 1280, 720)
         
-        self.setupTheme()
+        self.setupDarkPallete()
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -66,12 +66,20 @@ class MainWindow(QMainWindow):
         else:
             self.filterCombo.addItems(["No classes available"])
         
-    def setupTheme(self):
-        try:
-            with open('theme.qss', 'r') as f:
-                self.setStyleSheet(f.read())
-        except Exception as e:
-            print(f"Error loading theme: {e}")
+    def setupDarkPallete(self):
+        dark_pallete = QPalette()
+        dark_pallete.setColor(QPalette.Window, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.WindowText, Qt.white)
+        dark_pallete.setColor(QPalette.Base, QColor(35, 35, 35))
+        dark_pallete.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.ToolTipBase, Qt.white)
+        dark_pallete.setColor(QPalette.ToolTipText, Qt.white)
+        dark_pallete.setColor(QPalette.Text, Qt.white)
+        dark_pallete.setColor(QPalette.Button, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.ButtonText, Qt.white)
+        dark_pallete.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        dark_pallete.setColor(QPalette.HighlightedText, Qt.black)
+        self.setPalette(dark_pallete)
 
     def setupDocks(self):
         self.previewDock = QDockWidget("Camera and Display", self)
