@@ -6,7 +6,8 @@ from PyQt5.QtGui import *
 from pygrabber.dshow_graph import FilterGraph
 import cv2
 import os
-from dbc import db_manager
+from dbc import *
+from settings import *
 import shutil
 from datetime import datetime
 import requests
@@ -16,9 +17,10 @@ MODEL_CLASSES = ["cheating", "not_cheating"]
 
 def initialize_roboflow():
     try:
-        rf = Roboflow(api_key="Ig1F9Y1p5qSulNYEAxwb")
-        project = rf.workspace().project("giam_sat_gian_lan")
-        model = project.version(2).model
+        settings = Settings()
+        rf = Roboflow(api_key=settings.get_setting("roboflow", "api_key"))
+        project = rf.workspace().project(settings.get_setting("roboflow", "project"))
+        model = project.version(settings.get_setting("roboflow", "model_version")).model
         classes = MODEL_CLASSES
         return model, classes
     except Exception as e:
@@ -32,7 +34,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ProctorAI")
         self.setGeometry(100, 100, 1280, 720)
         
-        self.setupDarkPallete()
+        settings = Settings()
+        if settings.get_setting("theme") == "dark":
+            self.setupDarkPallete()
+        else:
+            self.setupLightPallete()
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -80,6 +86,21 @@ class MainWindow(QMainWindow):
         dark_pallete.setColor(QPalette.Highlight, QColor(42, 130, 218))
         dark_pallete.setColor(QPalette.HighlightedText, Qt.black)
         self.setPalette(dark_pallete)
+    
+    def setupLightPallete(self):
+        light_pallete = QPalette()
+        light_pallete.setColor(QPalette.Window, QColor(255, 255, 255))
+        light_pallete.setColor(QPalette.WindowText, Qt.black)
+        light_pallete.setColor(QPalette.Base, QColor(245, 245, 245))
+        light_pallete.setColor(QPalette.AlternateBase, QColor(255, 255, 255))
+        light_pallete.setColor(QPalette.ToolTipBase, Qt.black)
+        light_pallete.setColor(QPalette.ToolTipText, Qt.black)
+        light_pallete.setColor(QPalette.Text, Qt.black)
+        light_pallete.setColor(QPalette.Button, QColor(255, 255, 255))
+        light_pallete.setColor(QPalette.ButtonText, Qt.black)
+        light_pallete.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        light_pallete.setColor(QPalette.HighlightedText, Qt.white)
+        self.setPalette(light_pallete)
 
     def setupDocks(self):
         self.previewDock = QDockWidget("Camera and Display", self)
@@ -230,6 +251,18 @@ class MainWindow(QMainWindow):
         toggle_rm_action = QAction("Toggle Captured Images Dock", self)
         toggle_rm_action.triggered.connect(self.toggleReportManagerDock)
         self.toolbar.addAction(toggle_rm_action)
+        
+        settings_action = QAction("Settings", self)
+        settings_action.triggered.connect(self.show_settings)
+        self.toolbar.addAction(settings_action)
+
+    def show_settings(self):
+        settings = Settings()
+        dialog = SettingsDialog(settings, self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.setupDarkPallete() if settings.get_setting("theme") == "dark" else self.setupLightPallete()
+            db_manager.connection = None
+            db_manager.connect()
 
     def toggleCameraDisplayDock(self):
         self.previewDock.setVisible(not self.previewDock.isVisible())
