@@ -1,0 +1,91 @@
+/* Main Window */
+QMainWindow {
+    background-color: #353535;
+    color: white;
+}
+
+/* All widgets */
+QWidget {
+    background-color: #353535;
+    color: white;
+}
+
+/* Base elements */
+QLabel, QPushButton, QComboBox {
+    color: white;
+}
+
+/* Buttons */
+QPushButton {
+    background-color: #353535;
+    border: 1px solid #444444;
+    padding: 5px;
+    min-width: 80px;
+}
+
+QPushButton:hover {
+    background-color: #454545;
+}
+
+/* ComboBox */
+QComboBox {
+    background-color: #353535;
+    border: 1px solid #444444;
+    padding: 5px;
+}
+
+QComboBox::drop-down {
+    border: none;
+}
+
+QComboBox::down-arrow {
+    background-color: #353535;
+}
+
+/* Display Label */
+#displayLabel {
+    background-color: black;
+    border: 2px solid #444444;
+}
+
+/* Dock Widgets */
+QDockWidget {
+    color: white;
+    titlebar-close-icon: url(close.png);
+    titlebar-normal-icon: url(float.png);
+}
+
+QDockWidget::title {
+    background: #353535;
+    padding-left: 5px;
+}
+
+/* Status Bar */
+QStatusBar {
+    background: #353535;
+    color: white;
+}
+
+QStatusBar QLabel {
+    padding: 3px;
+    border: 1px solid #444444;
+}
+
+/* Scroll Area */
+QScrollArea {
+    border: 1px solid #444444;
+}
+
+/* Slider */
+QSlider::groove:horizontal {
+    border: 1px solid #444444;
+    height: 8px;
+    background: #353535;
+}
+
+QSlider::handle:horizontal {
+    background: #2A82DA;
+    width: 18px;
+    margin: -2px 0;
+    border-radius: 3px;
+}
