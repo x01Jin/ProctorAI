@@ -651,41 +651,41 @@ class GUIManager:
 
     @staticmethod
     def display_captures(predictions, captures_layout):
-        while captures_layout.count():
-            child = captures_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        existing_images = GUIManager.get_existing_images(captures_layout)
+        GUIManager.add_new_images_to_layout(existing_images, captures_layout)
+        GUIManager.capture_and_add_new_detections(predictions, existing_images, captures_layout)
 
+    @staticmethod
+    def get_existing_images(captures_layout):
+        return {child.widget().image_path for child in (captures_layout.itemAt(i) for i in range(captures_layout.count())) if child.widget()}
+
+    @staticmethod
+    def add_new_images_to_layout(existing_images, captures_layout):
         fixed_width = 150
         fixed_height = 150
 
         for filename in os.listdir("tempcaptures"):
             if filename.endswith(".jpg"):
                 image_path = os.path.join("tempcaptures", filename)
-                image_label = ImageLabel(image_path)
-                pixmap = QPixmap(image_path)
-                pixmap = pixmap.scaled(fixed_width, fixed_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                image_label.setPixmap(pixmap)
-                image_label.setFixedSize(fixed_width, fixed_height)
-                image_label.setAlignment(Qt.AlignCenter)
-                captures_layout.insertWidget(0, image_label, alignment=Qt.AlignCenter)
+                if image_path not in existing_images:
+                    GUIManager.add_image_label_to_layout(image_path, captures_layout, fixed_width, fixed_height)
 
+    @staticmethod
+    def capture_and_add_new_detections(predictions, existing_images, captures_layout):
         for detection in predictions:
             if detection['class'] == window.get_selected_capture_class():
                 GUIManager.capture_image(detection, window.camera_manager.current_image)
-                existing_files = os.listdir("tempcaptures")
-                image_number = 1
-                while f"untagged({image_number}).jpg" in existing_files:
-                    image_number += 1
-                image_path = f"tempcaptures/untagged({image_number}).jpg"
-                if os.path.exists(image_path):
-                    image_label = ImageLabel(image_path)
-                    pixmap = QPixmap(image_path)
-                    pixmap = pixmap.scaled(fixed_width, fixed_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    image_label.setPixmap(pixmap)
-                    image_label.setFixedSize(fixed_width, fixed_height)
-                    image_label.setAlignment(Qt.AlignCenter)
-                    captures_layout.insertWidget(0, image_label, alignment=Qt.AlignCenter)
+                GUIManager.add_new_images_to_layout(existing_images, captures_layout)
+
+    @staticmethod
+    def add_image_label_to_layout(image_path, captures_layout, fixed_width, fixed_height):
+        image_label = ImageLabel(image_path)
+        pixmap = QPixmap(image_path)
+        pixmap = pixmap.scaled(fixed_width, fixed_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        image_label.setPixmap(pixmap)
+        image_label.setFixedSize(fixed_width, fixed_height)
+        image_label.setAlignment(Qt.AlignCenter)
+        captures_layout.insertWidget(0, image_label, alignment=Qt.AlignCenter)
 
 
 class ImageLabel(QLabel):
