@@ -707,8 +707,13 @@ class ImageLabel(QLabel):
             self.add_tag()
 
     def delete_image(self):
-        os.remove(self.image_path)
-        self.deleteLater()
+        try:
+            if os.path.exists(self.image_path):
+                os.remove(self.image_path)
+            self.deleteLater()
+        except Exception as e:
+            print(f"Error deleting image {self.image_path}: {e}")
+            self.deleteLater()
 
     def add_tag(self):
         tag, ok = QInputDialog.getText(self, "Add Tag", "Enter tag:")
