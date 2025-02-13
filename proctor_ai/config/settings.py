@@ -1,7 +1,7 @@
 import json
 import os
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt6.QtWidgets import *
+from PyQt6.QtCore import *
 
 class Settings:
     def __init__(self):
@@ -88,7 +88,7 @@ class SettingsDialog(QDialog):
         self.db_host = QLineEdit(self.settings.get_setting("database", "host"))
         self.db_user = QLineEdit(self.settings.get_setting("database", "user"))
         self.db_pass = QLineEdit(self.settings.get_setting("database", "password"))
-        self.db_pass.setEchoMode(QLineEdit.Password)
+        self.db_pass.setEchoMode(QLineEdit.EchoMode.Password)
         self.db_name = QLineEdit(self.settings.get_setting("database", "database"))
         db_layout.addRow("Host:", self.db_host)
         db_layout.addRow("User:", self.db_user)

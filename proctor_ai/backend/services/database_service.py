@@ -2,7 +2,6 @@ import mysql.connector
 from mysql.connector import Error
 import os
 import logging
-import time
 
 class DatabaseManager:
     def __init__(self):

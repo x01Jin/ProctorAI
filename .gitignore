@@ -4,6 +4,5 @@ experiment.py
 2confidence.py
 3threshold.py
 4test.py
-__pycache__/dbc.cpython-312.pyc
-__pycache__/settings.cpython-312.pyc
+__pycache__
 app_settings.json

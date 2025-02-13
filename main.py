@@ -1,17 +1,15 @@
 import sys
-from PyQt5.QtWidgets import *
+from PyQt6.QtWidgets import *
 from roboflow import Roboflow
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from pygrabber.dshow_graph import FilterGraph
-import cv2
+from PyQt6.QtCore import *
+from PyQt6.QtGui import *
 import os
-from dbc import *
-from settings import *
-import shutil
-from datetime import datetime
-import requests
-from fpdf import FPDF
+from proctor_ai.backend.services.database_service import db_manager
+from proctor_ai.config.settings import Settings, SettingsDialog
+from proctor_ai.backend.controllers.camera_controller import CameraManager
+from proctor_ai.backend.controllers.detection_controller import DetectionManager
+from proctor_ai.backend.controllers.report_controller import PDFReport
+from proctor_ai.backend.utils.gui_utils import GUIManager
 
 MODEL_CLASSES = ["cheating", "not_cheating"]
 
@@ -74,56 +72,56 @@ class MainWindow(QMainWindow):
         
     def setupDarkPallete(self):
         dark_pallete = QPalette()
-        dark_pallete.setColor(QPalette.Window, QColor(53, 53, 53))
-        dark_pallete.setColor(QPalette.WindowText, Qt.white)
-        dark_pallete.setColor(QPalette.Base, QColor(35, 35, 35))
-        dark_pallete.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-        dark_pallete.setColor(QPalette.ToolTipBase, Qt.white)
-        dark_pallete.setColor(QPalette.ToolTipText, Qt.white)
-        dark_pallete.setColor(QPalette.Text, Qt.white)
-        dark_pallete.setColor(QPalette.Button, QColor(53, 53, 53))
-        dark_pallete.setColor(QPalette.ButtonText, Qt.white)
-        dark_pallete.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        dark_pallete.setColor(QPalette.HighlightedText, Qt.black)
+        dark_pallete.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+        dark_pallete.setColor(QPalette.ColorRole.Base, QColor(35, 35, 35))
+        dark_pallete.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.white)
+        dark_pallete.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+        dark_pallete.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+        dark_pallete.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+        dark_pallete.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+        dark_pallete.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        dark_pallete.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
         self.setPalette(dark_pallete)
     
     def setupLightPallete(self):
         light_pallete = QPalette()
-        light_pallete.setColor(QPalette.Window, QColor(255, 255, 255))
-        light_pallete.setColor(QPalette.WindowText, Qt.black)
-        light_pallete.setColor(QPalette.Base, QColor(245, 245, 245))
-        light_pallete.setColor(QPalette.AlternateBase, QColor(255, 255, 255))
-        light_pallete.setColor(QPalette.ToolTipBase, Qt.black)
-        light_pallete.setColor(QPalette.ToolTipText, Qt.black)
-        light_pallete.setColor(QPalette.Text, Qt.black)
-        light_pallete.setColor(QPalette.Button, QColor(255, 255, 255))
-        light_pallete.setColor(QPalette.ButtonText, Qt.black)
-        light_pallete.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        light_pallete.setColor(QPalette.HighlightedText, Qt.white)
+        light_pallete.setColor(QPalette.ColorRole.Window, QColor(255, 255, 255))
+        light_pallete.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.black)
+        light_pallete.setColor(QPalette.ColorRole.Base, QColor(245, 245, 245))
+        light_pallete.setColor(QPalette.ColorRole.AlternateBase, QColor(255, 255, 255))
+        light_pallete.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.black)
+        light_pallete.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.black)
+        light_pallete.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.black)
+        light_pallete.setColor(QPalette.ColorRole.Button, QColor(255, 255, 255))
+        light_pallete.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.black)
+        light_pallete.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        light_pallete.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
         self.setPalette(light_pallete)
 
     def setupDocks(self):
         self.previewDock = QDockWidget("Camera and Display", self)
-        self.previewDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.previewDock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         camera_display_container = self.cameraDisplayDock()
         self.previewDock.setWidget(camera_display_container)
 
         self.reportDock = QDockWidget("Captured Images", self)
-        self.reportDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.reportDock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         report_manager_container = self.reportManagerDock()
         self.reportDock.setWidget(report_manager_container)
 
         self.controlsDock = QDockWidget("Detection Controls", self)
-        self.controlsDock.setAllowedAreas(Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea)
+        self.controlsDock.setAllowedAreas(Qt.DockWidgetArea.TopDockWidgetArea | Qt.DockWidgetArea.BottomDockWidgetArea)
         detection_controls_container = self.detectionControlsDock()
         self.controlsDock.setWidget(detection_controls_container)
 
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self.previewDock)
         splitter.addWidget(self.reportDock)
         self.setCentralWidget(splitter)
 
-        self.addDockWidget(Qt.TopDockWidgetArea, self.controlsDock)
+        self.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, self.controlsDock)
 
     def cameraDisplayDock(self):
         camera_display_container = QWidget()
@@ -143,7 +141,7 @@ class MainWindow(QMainWindow):
         self.displayLabel = QLabel()
         self.displayLabel.setFixedSize(640, 480)
         self.displayLabel.setStyleSheet("background-color: black; border: 2px solid #444444;")
-        display_label_layout.addWidget(self.displayLabel, alignment=Qt.AlignCenter)
+        display_label_layout.addWidget(self.displayLabel, alignment=Qt.AlignmentFlag.AlignCenter)
 
         camera_display_layout.addLayout(camera_controls_layout)
         camera_display_layout.addLayout(display_label_layout)
@@ -194,7 +192,7 @@ class MainWindow(QMainWindow):
         self.startDetectionButton = QPushButton("Start Detection")
         detection_controls_layout.addWidget(self.startDetectionButton)
 
-        self.confidenceSlider = QSlider(Qt.Horizontal)
+        self.confidenceSlider = QSlider(Qt.Orientation.Horizontal)
         self.confidenceSlider.setRange(0, 100)
         self.confidenceSlider.setValue(10)
         self.confidenceLabel = QLabel("10%")
@@ -259,7 +257,7 @@ class MainWindow(QMainWindow):
     def show_settings(self):
         settings = Settings()
         dialog = SettingsDialog(settings, self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.setupDarkPallete() if settings.get_setting("theme") == "dark" else self.setupLightPallete()
             db_manager.connection = None
             db_manager.connect()
@@ -280,480 +278,23 @@ class MainWindow(QMainWindow):
         self.detection_manager.toggle_detection()
 
     def update_display(self, frame):
-        GUIManager.display_frame(frame, self.displayLabel)
+        GUIManager.display_frame(frame, self.displayLabel, self)
 
     def update_detections(self, detections):
         self.detectedObjectsLabel.setText(f"Detected Objects: {len(detections)}")
-        GUIManager.display_captures(detections, self.imageLayout)
+        GUIManager.display_captures(detections, self.imageLayout, self)
     
     def closeEvent(self, event):
         reply = QMessageBox.question(self, 'Exit Confirmation',
-                                    "Are you sure you want to exit?",
-                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                                     "Are you sure you want to exit?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
-            GUIManager.cleanup()
+        if reply == QMessageBox.StandardButton.Yes:
+            GUIManager.cleanup(self)
+            GUIManager.refresh_captures(self.imageLayout)
             event.accept()
         else:
             event.ignore()
-
-
-class CameraManager(QObject):
-    frame_ready = pyqtSignal(object)
-
-    def __init__(self, main_window):
-        super().__init__()
-        self.main_window = main_window
-        self.camera_active = False
-        self.cap = None
-        self.current_image = None
-        self.camera_devices = self.list_cameras()
-        self.selected_camera = self.camera_devices[0] if self.camera_devices else ''
-        self.camera_thread = None
-
-        self.main_window.cameraCombo.currentIndexChanged.connect(self.on_camera_selected)
-
-    def list_cameras(self):
-        graph = FilterGraph()
-        devices = graph.get_input_devices()
-        self.main_window.cameraCombo.addItems(devices)
-        return devices
-
-    def on_camera_selected(self, index):
-        self.selected_camera = self.camera_devices[index]
-
-    def toggle_camera(self):
-        self.camera_active = not self.camera_active
-        if self.camera_active:
-            self.main_window.startCameraButton.setText("Stop Camera")
-            self.use_camera()
-        else:
-            self.main_window.startCameraButton.setText("Start Camera")
-            self.stop_camera()
-
-    def use_camera(self):
-        camera_index = self.camera_devices.index(self.selected_camera)
-        self.cap = cv2.VideoCapture(camera_index)
-        if self.cap.isOpened():
-            self.camera_thread = QThread()
-            self.camera_thread.run = self.update_camera
-            self.camera_thread.start()
-        else:
-            print("Selected camera is not available.")
-
-    def stop_camera(self):
-        self.camera_active = False
-        if self.camera_thread and self.camera_thread.isRunning():
-            self.camera_thread.quit()
-            self.camera_thread.wait()
-        if self.cap and self.cap.isOpened():
-            self.cap.release()
-            self.cap = None
-        self.clear_display()
-
-    def update_camera(self):
-        while self.camera_active and self.cap and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret:
-                self.current_image = frame
-                self.frame_ready.emit(frame)
-            QThread.msleep(16)
-
-    def clear_display(self):
-        self.main_window.displayLabel.clear()
-        self.main_window.displayLabel.setStyleSheet("background-color: black; border: 2px solid #444444;")
-
-    def __del__(self):
-        self.stop_camera()
-
-
-class DetectionManager(QObject):
-    detections_ready = pyqtSignal(list)
-    connection_status_changed = pyqtSignal(bool)
-
-    def __init__(self, model, main_window):
-        super().__init__()
-        self.detection_active = False
-        self.model = model
-        self.detections = []
-        self.main_window = main_window
-        self.detection_thread = None
-
-    def toggle_detection(self):
-        self.detection_active = not self.detection_active
-        if self.detection_active:
-            self.main_window.startDetectionButton.setText("Stop Detection")
-            self.detection_thread = QThread()
-            self.detection_thread.run = self.process_camera_feed
-            self.detection_thread.start()
-        else:
-            self.main_window.startDetectionButton.setText("Start Detection")
-            self.stop_detection()
-
-    def stop_detection(self):
-        self.detection_active = False
-        if self.detection_thread and self.detection_thread.isRunning():
-            self.detection_thread.terminate()
-            self.detection_thread.wait()
-
-    def process_camera_feed(self):
-        while self.detection_active and window.camera_manager.cap and window.camera_manager.cap.isOpened():
-            if window.camera_manager.current_image is not None:
-                self.detections = self.process_image(window.camera_manager.current_image)
-                self.detections_ready.emit(self.detections)
-            QThread.msleep(1000)
-
-    def process_image(self, image):
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        confidence_threshold = window.confidenceSlider.value()
-        
-        if not GUIManager.connection():
-            print("Connection Error. Retrying.")
-            self.connection_status_changed.emit(False)
-            QThread.sleep(3)
-            return self.process_image(image)
-        
-        try:
-            result = self.model.predict(image_rgb, confidence=confidence_threshold, overlap=30).json()
-            self.connection_status_changed.emit(True)
-            return result['predictions']
-        except requests.exceptions.ConnectionError:
-            print("Connection Error. Retrying.")
-            self.connection_status_changed.emit(False)
-            QThread.sleep(3)
-            return self.process_image(image)
-
-
-class PDFReport(FPDF):
-    def header(self):
-        self.set_font("Arial", 'B', 20)
-        self.cell(0, 5, "Proctor AI", ln=True, align='C')
-        self.cell(0, 8, "Generated Report", ln=True, align='C')
-        self.ln(5)
-        self.line(10, self.get_y(), 200, self.get_y())
-        self.ln(5)
-
-    def body(self, proctor, block, date, subject, room, start, end):
-        self.set_font("Arial", 'B', 12)
-        self.cell(120, 7, f"Name: {proctor}", ln=False)
-        self.cell(0, 7, f"Time Generated: {datetime.now().strftime('%H:%M:%S')}", ln=True)
-        self.cell(120, 7, f"Exam Date: {date}", ln=False)
-        self.cell(0, 7, f"Subject: {subject}", ln=True)
-        self.cell(120, 7, f"Block: {block}", ln=False)
-        self.cell(0, 7, f"Room: {room}", ln=True)
-        self.cell(120, 7, f"Start Time: {start}", ln=False)
-        self.cell(0, 7, f"End Time: {end}", ln=True)
-
-    @staticmethod
-    def prompt_report_details():
-        dialog = QDialog()
-        dialog.setWindowTitle("Report Details")
-        layout = QVBoxLayout(dialog)
-
-        def create_label_entry(text):
-            label = QLabel(text)
-            entry = QLineEdit()
-            layout.addWidget(label)
-            layout.addWidget(entry)
-            return entry
-
-        entry_proctor = create_label_entry("Proctor's Name:")
-        entry_block = create_label_entry("Block:")
-        entry_date = QDateEdit(calendarPopup=True)
-        entry_date.setDate(QDate.currentDate())
-        layout.addWidget(QLabel("Exam Date:"))
-        layout.addWidget(entry_date)
-        entry_subject = create_label_entry("Subject:")
-        entry_room = create_label_entry("Room:")
-        entry_start = QComboBox()
-        entry_start.addItems([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
-        layout.addWidget(QLabel("Start Time:"))
-        layout.addWidget(entry_start)
-        entry_end = QComboBox()
-        entry_end.addItems([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
-        layout.addWidget(QLabel("End Time:"))
-        layout.addWidget(entry_end)
-
-        submit_button = QPushButton("Submit")
-        layout.addWidget(submit_button)
-
-        def on_submit():
-            dialog.accept()
-
-        submit_button.clicked.connect(on_submit)
-        dialog.exec_()
-
-        return (entry_proctor.text(), entry_block.text(), entry_date.date().toString("yyyy-MM-dd"),
-                entry_subject.text(), entry_room.text(), entry_start.currentText(), entry_end.currentText())
-
-    @staticmethod
-    def save_pdf():
-        proctor, block, date, subject, room, start, end = PDFReport.prompt_report_details()
-        if not all([proctor, block, date, subject, room, start, end]):
-            QMessageBox.critical(None, "Error", "All fields must be filled out.")
-            return
-
-        db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
-
-        desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Report')
-        pdf_filename, _ = QFileDialog.getSaveFileName(None, "Save PDF", desktop_path, "PDF files (*.pdf)")
-        if not pdf_filename:
-            return
-
-        pdf = PDFReport()
-        pdf.set_auto_page_break(auto=True, margin=10)
-        pdf.add_page()
-        pdf.body(proctor, block, date, subject, room, start, end)
-
-        image_count = 0
-        x_positions = [10, 110]
-        y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
-
-        for filename in os.listdir("tempcaptures"):
-            if filename.endswith(".jpg"):
-                if image_count > 0 and image_count % 4 == 0:
-                    pdf.add_page()
-                    y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
-
-                image_path = os.path.join("tempcaptures", filename)
-                x = x_positions[image_count % 2]
-                y = y_positions[(image_count // 2) % 2]
-                pdf.image(image_path, x=x, y=y, w=90, h=90)
-                pdf.set_font("Arial", size=8)
-                pdf.set_xy(x, y - 5)
-                filename_without_extension = os.path.splitext(filename)[0]
-                pdf.cell(90, 5, filename_without_extension, 0, 0, 'C')
-                image_count += 1
-
-        pdf.output(pdf_filename)
-        QMessageBox.information(None, "PDF Saved", f"PDF saved as {pdf_filename}")
-        GUIManager.cleanup()
-
-
-class GUIManager:
-    @staticmethod
-    def update_status(internet_status_label, database_status_label):
-        GUIManager.update_internet_status(internet_status_label)
-        GUIManager.update_database_status(database_status_label)
-
-    @staticmethod
-    def update_internet_status(internet_status_label):
-        internet_status = "Connected" if GUIManager.connection() else "Disconnected"
-        internet_status_label.setText(f"Internet: {internet_status}")
-
-    @staticmethod
-    def update_database_status(database_status_label):
-        if db_manager.connection is None or not db_manager.connection.is_connected():
-            db_manager.connect()
-        database_status = "Connected" if db_manager.connection and db_manager.connection.is_connected() else "Disconnected"
-        database_status_label.setText(f"Database: {database_status}")
-
-    @staticmethod
-    def connection():
-        try:
-            requests.get("http://www.google.com", timeout=3)
-            return True
-        except requests.ConnectionError:
-            return False
-
-    @staticmethod
-    def create_temp_folder():
-        if not os.path.exists("tempcaptures"):
-            os.makedirs("tempcaptures")
-
-    @staticmethod
-    def capture_image(detection, current_image):
-        selected_class = window.get_selected_capture_class()
-        if detection['class'] != selected_class:
-            return
-
-        x_center, y_center = detection['x'], detection['y']
-        width, height = int(detection['width'] * 1.5), int(detection['height'] * 1.5)
-        x0, y0 = int(x_center - width / 2), int(y_center - height / 2)
-        x1, y1 = int(x_center + width / 2), int(y_center + height / 2)
-
-        x0 = max(0, x0)
-        y0 = max(0, y0)
-        x1 = min(current_image.shape[1], x1)
-        y1 = min(current_image.shape[0], y1)
-
-        image = current_image[y0:y1, x0:x1]
-
-        if image.size == 0:
-            print(f"Invalid crop: x0={x0}, y0={y0}, x1={x1}, y1={y1}, image_shape={current_image.shape}")
-            return
-
-        existing_files = os.listdir("tempcaptures")
-        image_number = 1
-        while f"untagged({image_number}).jpg" in existing_files:
-            image_number += 1
-        image_filename = f"tempcaptures/untagged({image_number}).jpg"
-
-        cv2.imwrite(image_filename, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-
-    @staticmethod
-    def cleanup():
-        folder = "tempcaptures"
-        if os.path.exists(folder):
-            for filename in os.listdir(folder):
-                file_path = os.path.join(folder, filename)
-                try:
-                    if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    print(f'Failed to delete {file_path}. Reason: {e}')
-        
-        while window.imageLayout.count():
-            child = window.imageLayout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-
-    @staticmethod
-    def display_frame(frame, display_label):
-        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        selected_filter = window.filterCombo.currentText()
-        for detection in window.detection_manager.detections:
-            if selected_filter == "All" or detection['class'] == selected_filter:
-                GUIManager.draw_bounding_box(image_rgb, detection)
-        GUIManager.update_canvas(image_rgb, display_label)
-
-    @staticmethod
-    def draw_bounding_box(image, detection):
-        x_center, y_center = detection['x'], detection['y']
-        width, height = detection['width'], detection['height']
-
-        x0, y0 = int(x_center - width / 2), int(y_center - height / 2)
-        x1, y1 = int(x_center + width / 2), int(y_center + height / 2)
-
-        class_name = detection['class']
-        confidence = detection['confidence']
-        color = (0, 255, 0) if class_name == "not_cheating" else (255, 0, 0)
-
-        cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
-        label_text = class_name if window.displayModeCombo.currentText() == "draw_labels" else f"{confidence:.2f}%"
-        GUIManager.put_text(image, label_text, x0, y0, color)
-
-    @staticmethod
-    def put_text(image, text, x, y, color):
-        text_size, baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-        text_x, text_y = x, y - text_size[1] - 4
-        cv2.rectangle(image, (text_x, text_y), (text_x + text_size[0], text_y + text_size[1] + baseline), color, -1)
-        cv2.putText(image, text, (text_x, text_y + text_size[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-    @staticmethod
-    def update_canvas(image_rgb, display_label):
-        height, width = image_rgb.shape[:2]
-        bytes_per_line = 3 * width
-        q_image = QImage(image_rgb.data, width, height, bytes_per_line, QImage.Format_RGB888)
-        display_label.setPixmap(QPixmap.fromImage(q_image))
-
-    @staticmethod
-    def display_captures(predictions, captures_layout):
-        existing_images = GUIManager.get_existing_images(captures_layout)
-        GUIManager.add_new_images_to_layout(existing_images, captures_layout)
-        GUIManager.capture_and_add_new_detections(predictions, existing_images, captures_layout)
-
-    @staticmethod
-    def get_existing_images(captures_layout):
-        return {child.widget().image_path for child in (captures_layout.itemAt(i) for i in range(captures_layout.count())) if child.widget()}
-
-    @staticmethod
-    def add_new_images_to_layout(existing_images, captures_layout):
-        fixed_width = 150
-        fixed_height = 150
-
-        for filename in os.listdir("tempcaptures"):
-            if filename.endswith(".jpg"):
-                image_path = os.path.join("tempcaptures", filename)
-                if image_path not in existing_images:
-                    GUIManager.add_image_label_to_layout(image_path, captures_layout, fixed_width, fixed_height)
-
-    @staticmethod
-    def capture_and_add_new_detections(predictions, existing_images, captures_layout):
-        for detection in predictions:
-            if detection['class'] == window.get_selected_capture_class():
-                GUIManager.capture_image(detection, window.camera_manager.current_image)
-                GUIManager.add_new_images_to_layout(existing_images, captures_layout)
-
-    @staticmethod
-    def add_image_label_to_layout(image_path, captures_layout, fixed_width, fixed_height):
-        image_label = ImageLabel(image_path)
-        pixmap = QPixmap(image_path)
-        pixmap = pixmap.scaled(fixed_width, fixed_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        image_label.setPixmap(pixmap)
-        image_label.setFixedSize(fixed_width, fixed_height)
-        image_label.setAlignment(Qt.AlignCenter)
-        captures_layout.insertWidget(0, image_label, alignment=Qt.AlignCenter)
-
-
-class ImageLabel(QLabel):
-    def __init__(self, image_path, parent=None):
-        super().__init__(parent)
-        self.image_path = image_path
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.show_context_menu)
-        self.tag = ""
-
-    def show_context_menu(self, pos):
-        context_menu = QMenu(self)
-        delete_action = context_menu.addAction("Delete")
-        edit_tag_action = context_menu.addAction("Edit Tag")
-        action = context_menu.exec_(self.mapToGlobal(pos))
-        if action == delete_action:
-            self.delete_image()
-        elif action == edit_tag_action:
-            self.add_tag()
-
-    def delete_image(self):
-        try:
-            if os.path.exists(self.image_path):
-                os.remove(self.image_path)
-            self.deleteLater()
-        except Exception as e:
-            print(f"Error deleting image {self.image_path}: {e}")
-            self.deleteLater()
-
-    def add_tag(self):
-        tag, ok = QInputDialog.getText(self, "Add Tag", "Enter tag:")
-        if ok and tag:
-            if self.is_valid_tag(tag):
-                self.tag = tag
-                self.setToolTip(tag)
-                self.update()
-                self.update_filename_with_tag()
-            else:
-                QMessageBox.critical(self, "Invalid Tag", "The tag contains invalid characters.")
-    
-    def redo_tag(self):
-        self.add_tag()
-
-    def is_valid_tag(self, tag):
-        invalid_chars = r'<>:"/\|?*'
-        return not any(char in invalid_chars for char in tag)
-
-    def update_filename_with_tag(self):
-        directory, original_filename = os.path.split(self.image_path)
-        _, ext = os.path.splitext(original_filename)
-        new_filename = f"{self.tag}{ext}"
-        new_filepath = os.path.join(directory, new_filename)
-
-        counter = 1
-        while os.path.exists(new_filepath):
-            new_filename = f"{self.tag}_{counter}{ext}"
-            new_filepath = os.path.join(directory, new_filename)
-            counter += 1
-
-        os.rename(self.image_path, new_filepath)
-        self.image_path = new_filepath
-
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        if self.toolTip():
-            painter = QPainter(self)
-            painter.setPen(Qt.red)
-            painter.drawText(self.rect(), Qt.AlignTop | Qt.AlignHCenter, self.toolTip())
 
 
 if __name__ == "__main__":
@@ -765,4 +306,4 @@ if __name__ == "__main__":
     window = MainWindow()
     
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
