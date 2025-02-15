@@ -2,7 +2,6 @@ from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
 import cv2
 import os
-import shutil
 import requests
 from backend.services.database_service import db_manager
 from frontend.components.image_label import ImageLabel
@@ -34,11 +33,6 @@ class GUIManager:
             return False
 
     @staticmethod
-    def create_temp_folder():
-        if not os.path.exists("tempcaptures"):
-            os.makedirs("tempcaptures")
-
-    @staticmethod
     def capture_image(detection, current_image, window):
         selected_class = window.get_selected_capture_class()
         if detection['class'] != selected_class:
@@ -67,53 +61,6 @@ class GUIManager:
         image_filename = f"tempcaptures/untagged({image_number}).jpg"
 
         cv2.imwrite(image_filename, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-
-    @staticmethod
-    def cleanup_files():
-        folder = "tempcaptures"
-        if not os.path.exists(folder):
-            return
-            
-        for filename in os.listdir(folder):
-            file_path = os.path.join(folder, filename)
-            try:
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            except Exception as e:
-                print(f'Failed to delete {file_path}. Reason: {e}')
-
-    @staticmethod
-    def cleanup_gui(window):
-        if not hasattr(window, 'imageLayout'):
-            return
-            
-        while window.imageLayout.count():
-            child = window.imageLayout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-                window.imageLayout.removeWidget(child.widget())
-            else:
-                window.imageLayout.removeItem(child)
-
-    @staticmethod
-    def refresh_captures(captures_layout):
-        while captures_layout.count():
-            child = captures_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-                captures_layout.removeWidget(child.widget())
-            else:
-                captures_layout.removeItem(child)
-        GUIManager.add_new_images_to_layout(set(), captures_layout)
-
-    @staticmethod
-    def cleanup(window):
-        GUIManager.cleanup_gui(window)
-        GUIManager.cleanup_files()
-        if hasattr(window, 'imageLayout'):
-            GUIManager.refresh_captures(window.imageLayout)
 
     @staticmethod
     def display_frame(frame, display_label, window):
@@ -155,35 +102,7 @@ class GUIManager:
         display_label.setPixmap(QPixmap.fromImage(q_image))
 
     @staticmethod
-    def display_captures(predictions, captures_layout, window):
-        existing_images = GUIManager.get_existing_images(captures_layout)
-        GUIManager.add_new_images_to_layout(existing_images, captures_layout)
-        GUIManager.capture_and_add_new_detections(predictions, existing_images, captures_layout, window)
-
-    @staticmethod
-    def get_existing_images(captures_layout):
-        return {child.widget().image_path for child in (captures_layout.itemAt(i) for i in range(captures_layout.count())) if child.widget()}
-
-    @staticmethod
-    def add_new_images_to_layout(existing_images, captures_layout):
-        fixed_width = 150
-        fixed_height = 150
-
-        for filename in os.listdir("tempcaptures"):
-            if filename.endswith(".jpg"):
-                image_path = os.path.join("tempcaptures", filename)
-                if image_path not in existing_images:
-                    GUIManager.add_image_label_to_layout(image_path, captures_layout, fixed_width, fixed_height)
-
-    @staticmethod
-    def capture_and_add_new_detections(predictions, existing_images, captures_layout, window):
-        for detection in predictions:
-            if detection['class'] == window.get_selected_capture_class():
-                GUIManager.capture_image(detection, window.camera_manager.current_image, window)
-                GUIManager.add_new_images_to_layout(existing_images, captures_layout)
-
-    @staticmethod
-    def add_image_label_to_layout(image_path, captures_layout, fixed_width, fixed_height):
+    def add_image_label_to_layout(image_path, captures_layout, fixed_width=150, fixed_height=150):
         image_label = ImageLabel(image_path)
         pixmap = QPixmap(image_path)
         pixmap = pixmap.scaled(fixed_width, fixed_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
@@ -191,3 +110,25 @@ class GUIManager:
         image_label.setFixedSize(fixed_width, fixed_height)
         image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         captures_layout.insertWidget(0, image_label, alignment=Qt.AlignmentFlag.AlignCenter)
+
+    @staticmethod
+    def remove_image_from_layout(image_path, captures_layout):
+        for i in range(captures_layout.count()):
+            widget = captures_layout.itemAt(i).widget()
+            if widget and hasattr(widget, 'image_path') and widget.image_path == image_path:
+                widget.deleteLater()
+                captures_layout.takeAt(i)
+                break
+    
+    @staticmethod
+    def cleanup():
+        if not os.path.exists("tempcaptures"):
+            return
+            
+        for filename in os.listdir("tempcaptures"):
+            if filename.endswith(".jpg"):
+                file_path = os.path.join("tempcaptures", filename)
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass

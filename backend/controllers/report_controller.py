@@ -109,5 +109,6 @@ class PDFReport(FPDF):
 
         pdf.output(pdf_filename)
         QMessageBox.information(PDFReport.dialog, "PDF Saved", f"PDF saved as {pdf_filename}")
-        GUIManager.cleanup(PDFReport.dialog)
+        GUIManager.cleanup()
+        PDFReport.dialog.close()
         PDFReport.dialog = None

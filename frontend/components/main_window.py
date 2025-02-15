@@ -14,6 +14,7 @@ from .report_manager import ReportManagerDock
 from .status_bar import StatusBarManager
 from .toolbar import ToolbarManager
 from frontend.themes.theme_manager import ThemeManager
+from backend.utils.gui_utils import GUIManager
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -58,7 +59,7 @@ class MainWindow(QMainWindow):
 
     def connect_signals(self):
         self.camera_manager.frame_ready.connect(self.camera_display.update_display)
-        self.detection_manager.detections_ready.connect(self.update_detections)
+        self.detection_manager.detections_ready.connect(self.process_detections)
         
         self.camera_display.camera_toggle_requested.connect(self.toggle_camera)
         self.detection_controls.detection_toggle_requested.connect(self.toggle_detection)
@@ -84,9 +85,11 @@ class MainWindow(QMainWindow):
         from backend.controllers.report_controller import PDFReport
         PDFReport.save_pdf()
 
-    def update_detections(self, detections):
+    def process_detections(self, detections):
         self.status_bar.update_detections_count(len(detections))
-        self.report_manager.display_captures(detections)
+        for detection in detections:
+            if detection['class'] == self.get_selected_capture_class():
+                GUIManager.capture_image(detection, self.camera_manager.current_image, self)
 
     def closeEvent(self, event):
         reply = QMessageBox.question(
