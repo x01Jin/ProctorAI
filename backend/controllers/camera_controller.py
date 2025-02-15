@@ -2,6 +2,23 @@ from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from pygrabber.dshow_graph import FilterGraph
 import cv2
 
+class CameraThread(QThread):
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+        self._is_running = True
+
+    def run(self):
+        while self._is_running and self.manager.cap and self.manager.cap.isOpened():
+            ret, frame = self.manager.cap.read()
+            if ret:
+                self.manager.current_image = frame
+                self.manager.frame_ready.emit(frame)
+            self.msleep(16)
+
+    def stop(self):
+        self._is_running = False
+
 class CameraManager(QObject):
     frame_ready = pyqtSignal(object)
 
@@ -39,8 +56,7 @@ class CameraManager(QObject):
         camera_index = self.camera_devices.index(self.selected_camera)
         self.cap = cv2.VideoCapture(camera_index)
         if self.cap.isOpened():
-            self.camera_thread = QThread()
-            self.camera_thread.run = self.update_camera
+            self.camera_thread = CameraThread(self)
             self.camera_thread.start()
         else:
             print("Selected camera is not available.")
@@ -48,20 +64,12 @@ class CameraManager(QObject):
     def stop_camera(self):
         self.camera_active = False
         if self.camera_thread and self.camera_thread.isRunning():
-            self.camera_thread.quit()
+            self.camera_thread.stop()
             self.camera_thread.wait()
         if self.cap and self.cap.isOpened():
             self.cap.release()
             self.cap = None
         self.clear_display()
-
-    def update_camera(self):
-        while self.camera_active and self.cap and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret:
-                self.current_image = frame
-                self.frame_ready.emit(frame)
-            QThread.msleep(16)
 
     def clear_display(self):
         self.main_window.camera_display.display_label.clear()
