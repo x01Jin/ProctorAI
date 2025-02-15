@@ -1,61 +1,137 @@
 # ProctorAI
 
-## Group Name: Croissants
+An AI-powered proctoring system for monitoring and detecting potential academic misconduct.
 
-## Thesis Title: ProctorAI
+## Setup Instructions
 
-### Overview
-ProctorAI is an innovative application developed as part of a thesis project at Universidad de Dagupan (UDD). The app leverages AI technology to detect suspicious behavior during exams, providing real-time monitoring and reporting capabilities.
+1. Clone the repository
 
-### Requirements
-This project requires several Python packages to function correctly. A `requirements.txt` file is included in the project directory to facilitate the installation of these dependencies.
+```bash
+git clone [repository-url]
+cd ProctorAI
+```
 
-### Installation Instructions
+1. Install dependencies
 
-1. **Clone the Repository**
-    - if you have Git installed open ide terminal and do this:
-    ```bash
-    git clone https://github.com/x01Jin/ProctorAI
-    cd ProctorAI
-    ```
-    - if you do not have git installed Just download the Code (go at the top of this page and find the green "Code" button click it and "Download ZIP")
+```bash
+pip install -r requirements.txt
+```
 
-2. **Set Up a Virtual Environment (Optional but Recommended)**
-    Using venv:
-    ```bash
-    python -m venv .venv
-    # On Windows use:
-    venv\Scripts\activate
-    ```
-3. **Install Required Packages Use the following command to install all required packages listed in requirements.txt:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-4. **Database Setup**
-    - install and setup "XAMPP"
-    - open XAMPP Control Panel
-    - start "Apache" and "MySQL"
-    - click Admin of MySQL
-    - find and click Import tab once in phpMyAdmin
-    - click "Choose File" and use "proctorai.sql" which is included when cloning/downloaded the repository
-    - click "Import" at the very bottom
-    - after that the database is ready
+1. Configure environment
 
-### Usage Instructions
+- Copy the example environment file:
 
-1. **Run the Application**
+```bash
+cp .env.example .env
+```
 
-2. **Using the App**
+- Edit `.env` with your credentials:
+  - Set your Roboflow API key
+  - Configure database settings
+  - Adjust other settings as needed
 
-  - Click on "Use Camera" to start the camera feed.
-  - Adjust the confidence threshold using the slider.
-  - Select the display mode (labels or confidence) from the dropdown menu.
-  - Choose the label filter (cheating or not cheating) from the dropdown menu.
-  - Click "Start Detection" to begin monitoring.
-  - If cheating is detected, images will be saved in the tempcaptures folder.
-  - Use "Generate PDF" to create a report of captured images.
-  - Click "Clear Temp Images" to delete all temporary captures.
-  
-### License
-This project is for educational purposes only and is not intended for commercial use.
+1. Database Setup
 
+- Ensure XAMPP MySQL service is running
+- Import the database schema:
+
+```bash
+mysql -u root -p proctorai < proctorai.sql
+```
+
+## Configuration
+
+### Environment Variables
+
+The application uses environment variables for configuration. These can be set in the `.env` file:
+
+```ini
+# Application Environment
+APP_ENV=development
+
+# Roboflow Configuration
+ROBOFLOW_API_KEY=your_api_key_here
+ROBOFLOW_PROJECT=your_project_name
+ROBOFLOW_MODEL_VERSION=2
+
+# Database Configuration
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=proctorai
+```
+
+### Settings Management
+
+The application uses a settings system that supports:
+
+- Environment-based configuration
+- Secure credential storage
+- UI-based settings management
+- Automatic settings validation
+
+Settings can be managed through:
+
+1. Environment variables (preferred for sensitive data)
+2. The settings dialog in the application
+3. Direct modification of `app_settings.json` (not recommended)
+
+## Running the Application
+
+Start the application:
+
+```bash
+python main.py
+```
+
+The application will:
+
+1. Load environment variables
+2. Initialize required directories
+3. Validate settings
+4. Launch the main window
+
+## Development Notes
+
+- Default configuration uses XAMPP MySQL server
+- Store sensitive information in `.env`, not in code
+- Test changes in development environment first
+- Use the settings dialog for configuration changes
+- Check logs in `~/.proctorai/logs` for troubleshooting
+
+## Security Best Practices
+
+1. Never commit sensitive credentials
+2. Keep the `.env` file secure and private
+3. Use strong database passwords
+4. Regularly update dependencies
+5. Monitor application logs for issues
+
+## Troubleshooting
+
+1. Settings Issues
+
+   - Check `.env` file exists and is properly configured
+   - Verify database connection settings
+   - Ensure Roboflow API key is valid
+
+2. Database Connection
+
+   - Verify XAMPP MySQL is running
+   - Check database credentials
+   - Ensure database exists and is properly initialized
+
+3. Camera Issues
+
+   - Check camera permissions
+   - Verify camera is not in use by other applications
+   - Test with different camera indices
+
+## Contributing
+
+1. Create a feature branch
+2. Make your changes
+3. Test thoroughly
+4. Create a pull request
+
+Please ensure all sensitive data is properly handled and no credentials are committed to the repository.
