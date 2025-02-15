@@ -1,7 +1,10 @@
 import json
 import os
-from PyQt6.QtWidgets import *
-from PyQt6.QtCore import *
+from PyQt6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QGroupBox,
+    QFormLayout, QComboBox, QLabel, QLineEdit,
+    QSpinBox, QPushButton
+)
 
 class Settings:
     def __init__(self):

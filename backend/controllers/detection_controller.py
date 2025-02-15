@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 import cv2
 import requests
-from proctor_ai.backend.utils.gui_utils import GUIManager
+from backend.utils.gui_utils import GUIManager
 
 class DetectionManager(QObject):
     detections_ready = pyqtSignal(list)

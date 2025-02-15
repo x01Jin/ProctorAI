@@ -4,8 +4,8 @@ import cv2
 import os
 import shutil
 import requests
-from proctor_ai.backend.services.database_service import db_manager
-from proctor_ai.frontend.components.image_label import ImageLabel
+from backend.services.database_service import db_manager
+from frontend.components.image_label import ImageLabel
 
 class GUIManager:
     @staticmethod

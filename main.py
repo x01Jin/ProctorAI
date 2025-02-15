@@ -1,15 +1,20 @@
 import sys
-from PyQt6.QtWidgets import *
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QDockWidget, QLabel, QPushButton,
+    QComboBox, QVBoxLayout, QHBoxLayout, QScrollArea,
+    QStatusBar, QToolBar, QMessageBox, QDialog, QSlider,
+    QApplication, QSplitter
+)
 from roboflow import Roboflow
-from PyQt6.QtCore import *
-from PyQt6.QtGui import *
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPalette, QColor, QAction
 import os
-from proctor_ai.backend.services.database_service import db_manager
-from proctor_ai.config.settings import Settings, SettingsDialog
-from proctor_ai.backend.controllers.camera_controller import CameraManager
-from proctor_ai.backend.controllers.detection_controller import DetectionManager
-from proctor_ai.backend.controllers.report_controller import PDFReport
-from proctor_ai.backend.utils.gui_utils import GUIManager
+from backend.services.database_service import db_manager
+from config.settings import Settings, SettingsDialog
+from backend.controllers.camera_controller import CameraManager
+from backend.controllers.detection_controller import DetectionManager
+from backend.controllers.report_controller import PDFReport
+from backend.utils.gui_utils import GUIManager
 
 MODEL_CLASSES = ["cheating", "not_cheating"]
 

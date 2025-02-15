@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDateEdit, 
 from PyQt6.QtCore import QDate
 from datetime import datetime
 import os
-from proctor_ai.backend.services.database_service import db_manager
-from proctor_ai.backend.utils.gui_utils import GUIManager
+from backend.services.database_service import db_manager
+from backend.utils.gui_utils import GUIManager
 
 class PDFReport(FPDF):
     def header(self):
