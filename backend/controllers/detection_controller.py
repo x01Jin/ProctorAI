@@ -18,12 +18,12 @@ class DetectionManager(QObject):
     def toggle_detection(self):
         self.detection_active = not self.detection_active
         if self.detection_active:
-            self.main_window.startDetectionButton.setText("Stop Detection")
+            self.main_window.detection_controls.update_detection_button_text(True)
             self.detection_thread = QThread()
             self.detection_thread.run = self.process_camera_feed
             self.detection_thread.start()
         else:
-            self.main_window.startDetectionButton.setText("Start Detection")
+            self.main_window.detection_controls.update_detection_button_text(False)
             self.stop_detection()
 
     def stop_detection(self):
@@ -41,7 +41,7 @@ class DetectionManager(QObject):
 
     def process_image(self, image):
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        confidence_threshold = self.main_window.confidenceSlider.value()
+        confidence_threshold = self.main_window.detection_controls.get_confidence_threshold()
         
         if not GUIManager.connection():
             print("Connection Error. Retrying.")

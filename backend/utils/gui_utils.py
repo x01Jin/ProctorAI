@@ -118,7 +118,7 @@ class GUIManager:
     @staticmethod
     def display_frame(frame, display_label, window):
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        selected_filter = window.filterCombo.currentText()
+        selected_filter = window.detection_controls.filter_combo.currentText()
         for detection in window.detection_manager.detections:
             if selected_filter == "All" or detection['class'] == selected_filter:
                 GUIManager.draw_bounding_box(image_rgb, detection, window)
@@ -137,7 +137,7 @@ class GUIManager:
         color = (0, 255, 0) if class_name == "not_cheating" else (255, 0, 0)
 
         cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
-        label_text = class_name if window.displayModeCombo.currentText() == "draw_labels" else f"{confidence:.2f}%"
+        label_text = class_name if window.detection_controls.display_mode_combo.currentText() == "draw_labels" else f"{confidence:.2f}%"
         GUIManager.put_text(image, label_text, x0, y0, color)
 
     @staticmethod

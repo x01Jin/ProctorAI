@@ -15,12 +15,12 @@ class CameraManager(QObject):
         self.selected_camera = self.camera_devices[0] if self.camera_devices else ''
         self.camera_thread = None
 
-        self.main_window.cameraCombo.currentIndexChanged.connect(self.on_camera_selected)
+        self.main_window.camera_display.camera_combo.currentIndexChanged.connect(self.on_camera_selected)
 
     def list_cameras(self):
         graph = FilterGraph()
         devices = graph.get_input_devices()
-        self.main_window.cameraCombo.addItems(devices)
+        self.main_window.camera_display.populate_camera_list(devices)
         return devices
 
     def on_camera_selected(self, index):
@@ -29,10 +29,10 @@ class CameraManager(QObject):
     def toggle_camera(self):
         self.camera_active = not self.camera_active
         if self.camera_active:
-            self.main_window.startCameraButton.setText("Stop Camera")
+            self.main_window.camera_display.update_camera_button_text(True)
             self.use_camera()
         else:
-            self.main_window.startCameraButton.setText("Start Camera")
+            self.main_window.camera_display.update_camera_button_text(False)
             self.stop_camera()
 
     def use_camera(self):
@@ -64,8 +64,11 @@ class CameraManager(QObject):
             QThread.msleep(16)
 
     def clear_display(self):
-        self.main_window.displayLabel.clear()
-        self.main_window.displayLabel.setStyleSheet("background-color: black; border: 2px solid #444444;")
+        self.main_window.camera_display.display_label.clear()
+        self.main_window.camera_display.display_label.setStyleSheet("background-color: black; border: 2px solid #444444;")
 
     def __del__(self):
+        self.stop_camera()
+
+    def cleanup(self):
         self.stop_camera()
