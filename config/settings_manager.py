@@ -26,8 +26,8 @@ class SettingsManager:
             "theme": "dark",
             "roboflow": {
                 "api_key": os.getenv('ROBOFLOW_API_KEY', ''),
-                "project": os.getenv('ROBOFLOW_PROJECT', 'giam_sat_gian_lan'),
-                "model_version": int(os.getenv('ROBOFLOW_MODEL_VERSION', '2'))
+                "project": os.getenv('ROBOFLOW_PROJECT', ''),
+                "model_version": int(os.getenv('ROBOFLOW_MODEL_VERSION', '1'))
             },
             "database": {
                 "host": os.getenv('DB_HOST', 'localhost'),
@@ -40,11 +40,15 @@ class SettingsManager:
         self._settings_data = self.load_settings()
     
     def load_settings(self):
+        settings = self._default_settings.copy()
         if Path(self.settings_file).exists():
             with open(self.settings_file, 'r') as f:
                 stored_settings = json.load(f)
-                return self._merge_settings(self._default_settings, stored_settings)
-        return self._default_settings.copy()
+                settings = self._merge_settings(settings, stored_settings)
+        else:
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=4)
+        return settings
     
     def _merge_settings(self, default, stored):
         result = default.copy()
@@ -74,13 +78,17 @@ class SettingsManager:
         self.save_settings()
     
     def validate_settings(self):
+        if self.has_empty_credentials():
+            raise ValueError("Required credentials are missing")
+
+    def has_empty_credentials(self):
         if not self.get_setting("roboflow", "api_key"):
-            raise ValueError("Roboflow API key is required")
+            return True
         
         db_settings = self.get_setting("database")
         required_db_fields = ["host", "user", "database"]
-        missing_fields = [field for field in required_db_fields 
-                         if not db_settings.get(field)]
-        
-        if missing_fields:
-            raise ValueError(f"Missing required database fields: {', '.join(missing_fields)}")
+        for field in required_db_fields:
+            if not db_settings.get(field):
+                return True
+                
+        return False

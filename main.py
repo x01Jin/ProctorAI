@@ -2,9 +2,8 @@ import sys
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 from frontend.components.main_window import MainWindow
-from config.settings_manager import SettingsManager
 
 def ensure_directories():
     directories = [
@@ -15,26 +14,16 @@ def ensure_directories():
     for directory in directories:
         Path(directory).mkdir(parents=True, exist_ok=True)
 
-def init_settings():
-    try:
-        settings = SettingsManager()
-        settings.validate_settings()
-        return True
-    except ValueError as e:
-        QMessageBox.critical(None, "Settings Error", str(e))
-        return False
-    except Exception as e:
-        QMessageBox.critical(None, "Error", f"Failed to initialize settings: {str(e)}")
-        return False
-
 def main():
     load_dotenv()
     ensure_directories()
     
-    if not init_settings():
+    app = QApplication(sys.argv)
+    
+    from config.init_settings import initialize_settings
+    if not initialize_settings():
         sys.exit(1)
     
-    app = QApplication(sys.argv)
     app.setStyle("Fusion")
     
     window = MainWindow()
