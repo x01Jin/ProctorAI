@@ -1,7 +1,6 @@
 from fpdf import FPDF
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDateEdit, QComboBox, QPushButton, QFileDialog, QMessageBox
 from PyQt6.QtCore import QDate
-from datetime import datetime
 import os
 from backend.services.database_service import db_manager
 from backend.utils.gui_utils import GUIManager
@@ -15,16 +14,15 @@ class PDFReport(FPDF):
         self.line(10, self.get_y(), 200, self.get_y())
         self.ln(5)
 
-    def body(self, proctor, block, date, subject, room, start, end):
+    def body(self, proctor, block, date, subject, room, start, end, num_students):
         self.set_font("Arial", 'B', 12)
-        self.cell(120, 7, f"Name: {proctor}", ln=False)
-        self.cell(0, 7, f"Time Generated: {datetime.now().strftime('%H:%M:%S')}", ln=True)
+        self.cell(120, 7, f"Proctor: {proctor}", ln=False)
+        self.cell(0, 7, f"Number of Students: {num_students}", ln=True)
         self.cell(120, 7, f"Exam Date: {date}", ln=False)
         self.cell(0, 7, f"Subject: {subject}", ln=True)
         self.cell(120, 7, f"Block: {block}", ln=False)
         self.cell(0, 7, f"Room: {room}", ln=True)
-        self.cell(120, 7, f"Start Time: {start}", ln=False)
-        self.cell(0, 7, f"End Time: {end}", ln=True)
+        self.cell(0, 7, f"Exam Time: {start} - {end}", ln=True)
 
     @staticmethod
     def prompt_report_details():
@@ -47,6 +45,7 @@ class PDFReport(FPDF):
         layout.addWidget(entry_date)
         entry_subject = create_label_entry("Subject:")
         entry_room = create_label_entry("Room:")
+        entry_num_students = create_label_entry("Number of Students:")
         entry_start = QComboBox()
         entry_start.addItems([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
         layout.addWidget(QLabel("Start Time:"))
@@ -66,16 +65,17 @@ class PDFReport(FPDF):
         PDFReport.dialog.exec()
 
         return (entry_proctor.text(), entry_block.text(), entry_date.date().toString("yyyy-MM-dd"),
-                entry_subject.text(), entry_room.text(), entry_start.currentText(), entry_end.currentText())
+                entry_subject.text(), entry_room.text(), entry_start.currentText(), entry_end.currentText(),
+                entry_num_students.text())
 
     @staticmethod
     def save_pdf():
-        proctor, block, date, subject, room, start, end = PDFReport.prompt_report_details()
-        if not all([proctor, block, date, subject, room, start, end]):
+        proctor, block, date, subject, room, start, end, num_students = PDFReport.prompt_report_details()
+        if not all([proctor, block, date, subject, room, start, end, num_students]):
             QMessageBox.critical(PDFReport.dialog, "Error", "All fields must be filled out.")
             return
 
-        db_manager.insert_report_details(proctor, block, date, subject, room, start, end)
+        db_manager.insert_report_details(proctor, block, date, subject, room, start, end, num_students)
 
         desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Report')
         pdf_filename, _ = QFileDialog.getSaveFileName(None, "Save PDF", desktop_path, "PDF files (*.pdf)")
@@ -85,7 +85,7 @@ class PDFReport(FPDF):
         pdf = PDFReport()
         pdf.set_auto_page_break(auto=True, margin=10)
         pdf.add_page()
-        pdf.body(proctor, block, date, subject, room, start, end)
+        pdf.body(proctor, block, date, subject, room, start, end, num_students)
 
         image_count = 0
         x_positions = [10, 110]
