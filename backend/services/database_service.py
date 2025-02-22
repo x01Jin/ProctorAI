@@ -35,10 +35,14 @@ class DatabaseManager:
         try:
             cursor = self.connection.cursor()
             query = """
-            INSERT INTO reportlog (proctor, block, date, subject, room, start, end, num_students)
+            INSERT INTO reportlog (proctor, num_students, block, subject, room, start, end, date)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
-            values = (proctor, block, date, subject, room, start, end, int(num_students))
+            try:
+                num_students_int = int(num_students)
+            except ValueError:
+                raise ValueError("Number of students must be a valid integer")
+            values = (proctor, num_students_int, block, subject, room, start, end, date)
             cursor.execute(query, values)
             self.connection.commit()
             cursor.close()
