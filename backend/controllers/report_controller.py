@@ -2,13 +2,17 @@ import os
 from backend.services.database_service import db_manager
 from backend.utils.gui_utils import GUIManager
 from fpdf import FPDF
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDateEdit, QComboBox, QPushButton, QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDateEdit, QComboBox, QPushButton, QMessageBox
 from PyQt6.QtCore import QDate
+from PyQt6.QtGui import QIntValidator
 
 MIN_STUDENTS = 1
 MAX_STUDENTS = 1000
 EMPTY_FIELDS_MESSAGE = "All fields must be filled out."
 INVALID_STUDENTS_MESSAGE = f"Number of students must be a positive number between {MIN_STUDENTS} and {MAX_STUDENTS}."
+REPORT_CANCELLED_MESSAGE = "Reporting was cancelled."
+REPORT_DIR_NAME = "ProctorAI-Report"
+NUMBER_FIELD_MESSAGE = "You can only put numbers here"
 
 class PDFReport(FPDF):
     def header(self):
@@ -58,9 +62,15 @@ class PDFReport(FPDF):
 
     @staticmethod
     def prompt_report_details():
+        desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        report_dir = os.path.join(desktop_path, REPORT_DIR_NAME)
+        if not os.path.exists(report_dir):
+            os.makedirs(report_dir)
+
         PDFReport.dialog = QDialog()
         PDFReport.dialog.setWindowTitle("Report Details")
         layout = QVBoxLayout(PDFReport.dialog)
+        PDFReport.is_completed = False
 
         def create_label_entry(text):
             label = QLabel(text)
@@ -69,8 +79,18 @@ class PDFReport(FPDF):
             layout.addWidget(entry)
             return entry
 
+        def closeEvent(event):
+            if not PDFReport.is_completed:
+                QMessageBox.information(PDFReport.dialog, "Cancelled", REPORT_CANCELLED_MESSAGE)
+            event.accept()
+
+        PDFReport.dialog.closeEvent = closeEvent
+
         entry_proctor = create_label_entry("Proctor's Name:")
         entry_num_students = create_label_entry("Number of Students:")
+        validator = QIntValidator(MIN_STUDENTS, MAX_STUDENTS)
+        entry_num_students.setValidator(validator)
+        entry_num_students.setToolTip(NUMBER_FIELD_MESSAGE)
         entry_block = create_label_entry("Block:")
         entry_subject = create_label_entry("Subject:")
         entry_room = create_label_entry("Room:")
@@ -130,23 +150,17 @@ class PDFReport(FPDF):
         proctor, block, date, subject, room, start, end, num_students = PDFReport.prompt_report_details()
         if not all([proctor, block, date, subject, room, start, end, num_students]):
             QMessageBox.critical(PDFReport.dialog, "Error", EMPTY_FIELDS_MESSAGE)
-            return
-
-        is_valid, error_message = PDFReport.validate_num_students(num_students)
-        if not is_valid:
-            QMessageBox.critical(PDFReport.dialog, "Error", error_message)
-            return
+            return False
 
         try:
             db_manager.insert_report_details(proctor, block, date, subject, room, start, end, num_students)
         except ValueError as e:
             QMessageBox.critical(PDFReport.dialog, "Error", str(e))
-            return
+            return False
 
-        desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Report')
-        pdf_filename, _ = QFileDialog.getSaveFileName(None, "Save PDF", desktop_path, "PDF files (*.pdf)")
-        if not pdf_filename:
-            return
+        desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        report_dir = os.path.join(desktop_path, REPORT_DIR_NAME)
+        pdf_filename = os.path.join(report_dir, f"{block}_{subject}_{date}.pdf")
 
         pdf = PDFReport()
         pdf.set_auto_page_break(auto=True, margin=10)
@@ -173,8 +187,14 @@ class PDFReport(FPDF):
                 pdf.cell(90, 5, filename_without_extension, 0, 0, 'C')
                 image_count += 1
 
-        pdf.output(pdf_filename)
-        QMessageBox.information(PDFReport.dialog, "PDF Saved", f"PDF saved as {pdf_filename}")
-        GUIManager.cleanup()
-        PDFReport.dialog.close()
-        PDFReport.dialog = None
+        try:
+            pdf.output(pdf_filename)
+            QMessageBox.information(PDFReport.dialog, "PDF Saved", f"PDF saved as {pdf_filename}")
+            GUIManager.cleanup()
+            PDFReport.is_completed = True
+            PDFReport.dialog.close()
+            PDFReport.dialog = None
+            return True
+        except Exception as e:
+            QMessageBox.critical(PDFReport.dialog, "Error", f"Failed to save PDF: {str(e)}")
+            return False
