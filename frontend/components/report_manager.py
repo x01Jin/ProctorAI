@@ -64,11 +64,14 @@ class ReportManagerDock(QDockWidget):
         if os.path.exists(self.temp_dir):
             current_files = {os.path.join(self.temp_dir, f) for f in os.listdir(self.temp_dir) if f.endswith('.jpg')}
 
-        displayed_files = {
-            self.image_layout.itemAt(i).widget().image_path
-            for i in range(self.image_layout.count())
-            if self.image_layout.itemAt(i).widget()
-        }
+        displayed_files = set()
+        for i in range(self.image_layout.count()):
+            try:
+                widget = self.image_layout.itemAt(i).widget()
+                if widget and not widget.isHidden() and hasattr(widget, 'image_path'):
+                    displayed_files.add(widget.image_path)
+            except (RuntimeError, AttributeError):
+                continue
 
         new_files = current_files - displayed_files
         removed_files = displayed_files - current_files
