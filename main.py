@@ -1,7 +1,6 @@
 import sys
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 from PyQt6.QtWidgets import QApplication
 from frontend.components.main_window import MainWindow
 
@@ -15,7 +14,6 @@ def ensure_directories():
         Path(directory).mkdir(parents=True, exist_ok=True)
 
 def main():
-    load_dotenv()
     ensure_directories()
     
     app = QApplication(sys.argv)

@@ -1,7 +1,7 @@
 import mysql.connector
 from mysql.connector import Error
-import os
 import logging
+from config.database_config import DB_CONFIG
 
 class DatabaseManager:
     def __init__(self):
@@ -10,12 +10,7 @@ class DatabaseManager:
 
     def connect(self):
         try:
-            self.connection = mysql.connector.connect(
-                host=os.getenv('DB_HOST', 'localhost'),
-                user=os.getenv('DB_USER', 'root'),
-                password=os.getenv('DB_PASSWORD', ''),
-                database=os.getenv('DB_NAME', 'proctorai')
-            )
+            self.connection = mysql.connector.connect(**DB_CONFIG)
             if self.connection.is_connected():
                 logging.info("Connection to MySQL database successful")
         except Error as e:
