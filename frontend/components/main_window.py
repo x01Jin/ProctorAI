@@ -7,7 +7,7 @@ from roboflow import Roboflow
 
 from backend.controllers.camera_controller import CameraManager
 from backend.controllers.detection_controller import DetectionManager
-from config.settings import Settings
+from config.settings_manager import SettingsManager
 from .camera_display import CameraDisplayDock
 from .detection_controls import DetectionControlsDock
 from .report_manager import ReportManagerDock
@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ProctorAI")
         self.setGeometry(100, 100, 1280, 720)
         
-        self.settings = Settings()
+        self.settings = SettingsManager()
         self.theme_manager = ThemeManager(self)
         self.setup_window()
         self.setup_components()

@@ -3,17 +3,17 @@ from PyQt6.QtWidgets import (
     QFormLayout, QComboBox, QLabel, QLineEdit,
     QSpinBox, QPushButton, QMessageBox
 )
-from .settings_manager import SettingsManager
 
 class SettingsDialog(QDialog):
     def __init__(self, settings, parent=None):
         super().__init__(parent)
-        self.settings = SettingsManager()
+        self.settings = settings
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.setup_ui()
         
     def setup_ui(self):
+        self.setFixedWidth(320)
         layout = QVBoxLayout()
         
         # Theme settings
@@ -40,7 +40,7 @@ class SettingsDialog(QDialog):
         
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["dark", "light"])
-        self.theme_combo.setCurrentText(self.settings.get_setting("theme"))
+        self.theme_combo.setCurrentText(self.settings.get_setting("theme", "theme"))
         
         layout.addWidget(QLabel("Application Theme:"))
         layout.addWidget(self.theme_combo)
@@ -58,11 +58,14 @@ class SettingsDialog(QDialog):
         
         self.version = QSpinBox()
         self.version.setMinimum(1)
-        self.version.setValue(self.settings.get_setting("roboflow", "model_version"))
+        self.version.setValue(int(self.settings.get_setting("roboflow", "model_version")))
+        
+        self.model_classes = QLineEdit(self.settings.get_setting("roboflow", "model_classes"))
         
         layout.addRow("API Key:", self.api_key)
         layout.addRow("Project:", self.project)
         layout.addRow("Version:", self.version)
+        layout.addRow("Model Classes:", self.model_classes)
         
         group.setLayout(layout)
         return group
@@ -100,12 +103,16 @@ class SettingsDialog(QDialog):
         return layout
     
     def _validate_inputs(self):
-        if not self.api_key.text().strip():
+        if not self.api_key.text().strip() or self.api_key.text().strip() == 'REQUIRED':
             self._show_error("Roboflow API key is required")
             return False
             
-        if not self.project.text().strip():
+        if not self.project.text().strip() or self.project.text().strip() == 'REQUIRED':
             self._show_error("Roboflow project name is required")
+            return False
+            
+        if not self.model_classes.text().strip() or self.model_classes.text().strip() == 'REQUIRED':
+            self._show_error("Model classes are required (comma-separated)")
             return False
             
         if not all([self.db_host.text().strip(),
@@ -124,11 +131,12 @@ class SettingsDialog(QDialog):
             return
             
         try:
-            self.settings.update_setting("theme", None, self.theme_combo.currentText())
+            self.settings.update_setting("theme", "theme", self.theme_combo.currentText())
             
             self.settings.update_setting("roboflow", "api_key", self.api_key.text().strip())
             self.settings.update_setting("roboflow", "project", self.project.text().strip())
-            self.settings.update_setting("roboflow", "model_version", self.version.value())
+            self.settings.update_setting("roboflow", "model_version", str(self.version.value()))
+            self.settings.update_setting("roboflow", "model_classes", self.model_classes.text().strip())
             
             self.settings.update_setting("database", "host", self.db_host.text().strip())
             self.settings.update_setting("database", "user", self.db_user.text().strip())

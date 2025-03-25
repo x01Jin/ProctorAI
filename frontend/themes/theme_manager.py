@@ -5,7 +5,7 @@ class ThemeManager:
     def __init__(self, parent):
         self.parent = parent
         self.current_theme = None
-        theme = self.parent.settings.get_setting("theme", None)
+        theme = self.parent.settings.get_setting("theme", "theme")
         self.apply_theme(theme if theme else "dark")
 
     def apply_theme(self, theme_name):

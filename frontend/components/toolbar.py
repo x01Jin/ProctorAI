@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QToolBar
 from PyQt6.QtGui import QAction
-from config.settings import Settings, SettingsDialog
+from config.settings_manager import SettingsManager
+from config.settings_dialog import SettingsDialog
 from backend.services.database_service import db_manager
 
 class ToolbarManager:
@@ -43,10 +44,10 @@ class ToolbarManager:
         )
 
     def show_settings(self):
-        settings = Settings()
+        settings = SettingsManager()
         dialog = SettingsDialog(settings, self.parent)
         if dialog.exec() == SettingsDialog.DialogCode.Accepted:
-            theme = "dark" if settings.get_setting("theme") == "dark" else "light"
+            theme = settings.get_setting("theme", "theme")
             self.parent.theme_manager.apply_theme(theme)
             
             db_manager.connection = None
