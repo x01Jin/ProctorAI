@@ -12,9 +12,7 @@ from PyQt6.QtCore import QRegularExpression
 
 MIN_STUDENTS = 1
 MAX_STUDENTS = 1000
-EMPTY_FIELDS_MESSAGE = "All fields must be filled out."
 INVALID_STUDENTS_MESSAGE = f"Number of students must be a positive number between {MIN_STUDENTS} and {MAX_STUDENTS}."
-REPORT_CANCELLED_MESSAGE = "Reporting was cancelled."
 REPORT_DIR_NAME = "ProctorAI-Report"
 NUMBER_FIELD_MESSAGE = "You can only put numbers here"
 
@@ -90,7 +88,12 @@ class PDFReport(FPDF):
 
         def closeEvent(event):
             if not PDFReport.is_completed:
-                QMessageBox.information(PDFReport.dialog, "Cancelled", REPORT_CANCELLED_MESSAGE)
+                reply = QMessageBox.question(PDFReport.dialog, "Confirm Cancel", 
+                    "Are you sure you want to cancel report generation?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                if reply == QMessageBox.StandardButton.No:
+                    event.ignore()
+                    return
             event.accept()
 
         PDFReport.dialog.closeEvent = closeEvent
@@ -206,8 +209,29 @@ class PDFReport(FPDF):
         layout.addWidget(QLabel("Exam Date:"))
         layout.addWidget(entry_date)
 
+        def validate_fields():
+            is_valid = all([
+                entry_proctor.text(),
+                entry_block_year.text() and entry_block_course.text() and entry_block_number.text(),
+                entry_subject.text(),
+                entry_room_number.text(),
+                entry_num_students.text()
+            ])
+            submit_button.setEnabled(is_valid)
+            submit_button.setToolTip("All fields must be filled out" if not is_valid else "")
+
         submit_button = QPushButton("Submit")
+        submit_button.setEnabled(False)
+        submit_button.setToolTip("All fields must be filled out")
         layout.addWidget(submit_button)
+
+        entry_proctor.textChanged.connect(validate_fields)
+        entry_block_year.textChanged.connect(validate_fields)
+        entry_block_course.textChanged.connect(validate_fields)
+        entry_block_number.textChanged.connect(validate_fields)
+        entry_subject.textChanged.connect(validate_fields)
+        entry_room_number.textChanged.connect(validate_fields)
+        entry_num_students.textChanged.connect(validate_fields)
 
         def on_submit():
             is_valid_students, students_error = PDFReport.validate_num_students(entry_num_students.text())
@@ -230,7 +254,8 @@ class PDFReport(FPDF):
             PDFReport.dialog.accept()
 
         submit_button.clicked.connect(on_submit)
-        PDFReport.dialog.exec()
+        if not PDFReport.dialog.exec():
+            return None
 
         def convert_12h_to_24h(hour, minute, period):
             hour = int(hour)
@@ -304,10 +329,11 @@ class PDFReport(FPDF):
 
     @staticmethod
     def save_pdf():
-        proctor, block, date, subject, room, start, end, num_students = PDFReport.prompt_report_details()
-        if not all([proctor, block, date, subject, room, start, end, num_students]):
-            QMessageBox.critical(PDFReport.dialog, "Error", EMPTY_FIELDS_MESSAGE)
+        details = PDFReport.prompt_report_details()
+        if details is None:
             return False
+            
+        proctor, block, date, subject, room, start, end, num_students = details
 
         try:
             db_manager.insert_report_details(proctor, block, date, subject, room, start, end, num_students)
