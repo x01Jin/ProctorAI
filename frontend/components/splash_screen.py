@@ -176,13 +176,7 @@ class SplashScreen(QWidget):
         time.sleep(1)
         for attempt in range(retry_count):
             try:
-                if rf.initialize():
-                    self.log_message("loading Roboflow workspace...")
-                    QApplication.processEvents()
-                    time.sleep(1)
-                    self.log_message("loading Roboflow project...")
-                    QApplication.processEvents()
-                    time.sleep(1)
+                if rf.initialize(splash_screen=self):
                     self.log_message("Roboflow connection established", "success")
                     app_state.update_connection_status(roboflow=True)
                     return True
