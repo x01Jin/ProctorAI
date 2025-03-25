@@ -117,10 +117,14 @@ class SplashScreen(QWidget):
         self.log_display.moveCursor(QTextCursor.MoveOperation.End)
         self.log_display.textCursor().insertText(f"[{timestamp}] {prefix} {message}\n", format)
         self.log_display.verticalScrollBar().setValue(self.log_display.verticalScrollBar().maximum())
+        QApplication.processEvents()
+        time.sleep(0.5)
 
     def check_config(self):
         from config.settings_manager import SettingsManager
         self.log_message("Checking configuration...")
+        QApplication.processEvents()
+        time.sleep(1)
         try:
             settings = SettingsManager()
             settings.validate_settings()
@@ -136,6 +140,8 @@ class SplashScreen(QWidget):
     def check_internet(self, retry_count=3):
         app_state = ApplicationState.get_instance()
         self.log_message("Checking internet connection...")
+        QApplication.processEvents()
+        time.sleep(1)
         for attempt in range(retry_count):
             try:
                 urllib.request.urlopen("http://google.com", timeout=1)
@@ -156,8 +162,16 @@ class SplashScreen(QWidget):
         rf = app_state.roboflow
         
         self.log_message("Checking Roboflow connection...")
+        QApplication.processEvents()
+        time.sleep(1)
         for attempt in range(retry_count):
             try:
+                self.log_message("loading Roboflow workspace...")
+                QApplication.processEvents()
+                time.sleep(1)
+                self.log_message("loading Roboflow project...")
+                QApplication.processEvents()
+                time.sleep(1)
                 if rf.initialize():
                     self.log_message("Roboflow connection established", "success")
                     app_state.update_connection_status(roboflow=True)
@@ -177,6 +191,8 @@ class SplashScreen(QWidget):
         db = app_state.database
         
         self.log_message("Checking database connection...")
+        QApplication.processEvents()
+        time.sleep(1)
         for attempt in range(retry_count):
             try:
                 if db.test_connection():
@@ -207,7 +223,7 @@ class SplashScreen(QWidget):
     def _check_database(self, config_ok, internet_ok, roboflow_ok, on_complete):
         database_ok = self.check_database()
         
-        self.log_message("All checks complete, starting application in 3 seconds...", "info")
+        self.log_message("All checks complete, starting application...", "info")
         QTimer.singleShot(3000, lambda: self._complete_checks(config_ok, internet_ok, roboflow_ok, database_ok, on_complete))
 
     def _complete_checks(self, config_ok, internet_ok, roboflow_ok, database_ok, on_complete):
