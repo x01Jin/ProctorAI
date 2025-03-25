@@ -1,4 +1,7 @@
 /.venv
+/build
+/dist
+proctorai.spec
 experiment.py
 1OIDspec.py
 2confidence.py
