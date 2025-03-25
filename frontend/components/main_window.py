@@ -19,7 +19,12 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ProctorAI")
-        self.setGeometry(100, 100, 1280, 720)
+        self.resize(1280, 720)
+        screen = self.screen().availableGeometry()
+        window_geometry = self.frameGeometry()
+        center_point = screen.center()
+        window_geometry.moveCenter(center_point)
+        self.move(window_geometry.topLeft())
         
         # Initialize ApplicationState first
         self.app_state = ApplicationState.get_instance()
