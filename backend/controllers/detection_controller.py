@@ -21,6 +21,7 @@ class DetectionThread(QThread):
 
 class DetectionManager(QObject):
     detections_ready = pyqtSignal(list)
+    detection_stopped = pyqtSignal()
     connection_status_changed = pyqtSignal(bool)
 
     def __init__(self, model, main_window):
@@ -46,6 +47,8 @@ class DetectionManager(QObject):
         if self.detection_thread and self.detection_thread.isRunning():
             self.detection_thread.stop()
             self.detection_thread.wait()
+        self.detections = []
+        self.detection_stopped.emit()
 
     def process_image(self, image):
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

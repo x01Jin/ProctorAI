@@ -3,6 +3,8 @@ from PyQt6.QtWidgets import (
     QLabel, QComboBox, QPushButton
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPixmap, QImage
+import cv2
 from backend.utils.gui_utils import GUIManager
 
 class CameraDisplayDock(QDockWidget):
@@ -58,9 +60,22 @@ class CameraDisplayDock(QDockWidget):
             parent = parent.parent()
         return None
         
-    def update_display(self, frame):
+    def update_display(self, frame, clear_markers=False):
         main_window = self.parent().window()
-        GUIManager.display_frame(frame, self.display_label, main_window)
+        if clear_markers:
+            height, width = frame.shape[:2]
+            bytes_per_line = 3 * width
+            q_image = QImage(frame.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
+            self.display_label.setPixmap(QPixmap.fromImage(q_image))
+        else:
+            GUIManager.display_frame(frame, self.display_label, main_window)
+
+    def reset_display(self):
+        if hasattr(self.parent().window(), 'camera_manager'):
+            current_frame = self.parent().window().camera_manager.current_image
+            if current_frame is not None:
+                frame_rgb = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)
+                self.update_display(frame_rgb, clear_markers=True)
 
     def update_camera_button_text(self, is_running):
         self.camera_button.setText("Stop Camera" if is_running else "Start Camera")

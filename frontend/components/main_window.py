@@ -60,10 +60,15 @@ class MainWindow(QMainWindow):
     def connect_signals(self):
         self.camera_manager.frame_ready.connect(self.camera_display.update_display)
         self.detection_manager.detections_ready.connect(self.process_detections)
+        self.detection_manager.detection_stopped.connect(self.on_detection_stopped)
         
         self.camera_display.camera_toggle_requested.connect(self.toggle_camera)
         self.detection_controls.detection_toggle_requested.connect(self.toggle_detection)
         self.report_manager.pdf_generation_requested.connect(self.generate_pdf)
+
+    def on_detection_stopped(self):
+        self.camera_display.reset_display()
+        self.status_bar.update_detections_count(0)
 
     def initialize_roboflow(self):
         try:
