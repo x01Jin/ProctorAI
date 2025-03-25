@@ -4,11 +4,9 @@ from PyQt6.QtWidgets import (
     QSpinBox, QPushButton, QMessageBox
 )
 from PyQt6.QtCore import Qt
+from frontend.themes.theme_manager import ThemeManager
 
 class SettingsDialog(QDialog):
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        
     def __init__(self, settings, parent=None, setup_mode=False, setup_type=None):
         super().__init__(parent)
         self.settings = settings
@@ -17,11 +15,19 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Setup" if setup_mode else "Settings")
         self.setModal(True)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+        
+        self.theme_manager = ThemeManager(self)
+        current_theme = settings.get_setting("theme", "theme")
+        if current_theme:
+            self.theme_manager.apply_theme(current_theme)
+            
         self.setup_ui()
         
     def setup_ui(self):
-        self.setFixedWidth(320)
-        layout = QVBoxLayout()
+        self.setMinimumWidth(400)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
         
         # Theme settings
         theme_group = self._create_theme_group()
@@ -43,24 +49,30 @@ class SettingsDialog(QDialog):
     
     def _create_theme_group(self):
         group = QGroupBox("Theme")
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(group)
+        layout.setSpacing(8)
+        layout.setContentsMargins(15, 15, 15, 15)
         
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["dark", "light"])
         self.theme_combo.setCurrentText(self.settings.get_setting("theme", "theme"))
         
-        layout.addWidget(QLabel("Application Theme:"))
+        theme_label = QLabel("Application Theme:")
+        
+        layout.addWidget(theme_label)
         layout.addWidget(self.theme_combo)
-        group.setLayout(layout)
         
         return group
     
     def _create_roboflow_group(self):
         group = QGroupBox("Roboflow")
         layout = QFormLayout()
+        layout.setSpacing(8)
+        layout.setContentsMargins(15, 15, 15, 15)
         
         self.api_key = QLineEdit(self.settings.get_setting("roboflow", "api_key"))
         self.api_key.setEchoMode(QLineEdit.EchoMode.Password)
+        
         self.project = QLineEdit(self.settings.get_setting("roboflow", "project"))
         
         self.version = QSpinBox()
@@ -80,6 +92,8 @@ class SettingsDialog(QDialog):
     def _create_database_group(self):
         group = QGroupBox("Database")
         layout = QFormLayout()
+        layout.setSpacing(8)
+        layout.setContentsMargins(15, 15, 15, 15)
         
         self.db_host = QLineEdit(self.settings.get_setting("database", "host"))
         self.db_user = QLineEdit(self.settings.get_setting("database", "user"))
@@ -97,13 +111,17 @@ class SettingsDialog(QDialog):
     
     def _create_button_layout(self):
         layout = QHBoxLayout()
+        layout.setSpacing(10)
         
         save_btn = QPushButton("Save")
+        save_btn.setMinimumWidth(100)
         save_btn.clicked.connect(self._save_settings)
         
         cancel_btn = QPushButton("Cancel")
+        cancel_btn.setMinimumWidth(100)
         cancel_btn.clicked.connect(self._handle_cancel)
         
+        layout.addStretch()
         layout.addWidget(save_btn)
         layout.addWidget(cancel_btn)
         

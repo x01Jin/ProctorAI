@@ -1,26 +1,29 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QApplication
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor
+from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor, QPalette
 import time
 import urllib.request
 from backend.services.application_state import ApplicationState
 from config.settings_manager import SettingsManager
 from config.settings_dialog import SettingsDialog
+from frontend.themes.theme_manager import ThemeManager
 
 class SplashScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setFixedSize(600, 400)
+        
+        self.settings = SettingsManager()
+        self.theme_manager = ThemeManager(self)
+        theme = self.settings.get_setting("theme", "theme")
+        if theme:
+            self.theme_manager.apply_theme(theme)
+            
+        self.setProperty("class", "splash-screen")
         self.setStyleSheet("""
-            QWidget {
-                background: qlineargradient(
-                    x1: 0, y1: 0,
-                    x2: 0, y2: 1,
-                    stop: 0 #2B2B2B,
-                    stop: 1 #1E1E1E
-                );
-                border: 2px solid #404040;
+            QWidget[class="splash-screen"] {
+                border: 2px solid palette(dark);
                 border-radius: 10px;
             }
             QLabel {
@@ -28,12 +31,11 @@ class SplashScreen(QWidget):
                 border: none;
             }
             QTextEdit {
-                background-color: rgba(0, 0, 0, 0.3);
-                color: #FFFFFF;
-                border: 1px solid #333333;
+                background-color: palette(base);
+                color: palette(text);
+                border: 1px solid palette(dark);
                 border-radius: 5px;
                 padding: 5px;
-                selection-background-color: #404040;
             }
         """)
         self.setup_ui()
@@ -56,7 +58,7 @@ class SplashScreen(QWidget):
         title_font.setPointSize(24)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #FFFFFF;")
+        title_label.setStyleSheet("color: palette(text);")
         layout.addWidget(title_label)
         
         subtitle_label = QLabel("Cheating Detection Assistant")
@@ -64,7 +66,7 @@ class SplashScreen(QWidget):
         subtitle_font = QFont()
         subtitle_font.setPointSize(14)
         subtitle_label.setFont(subtitle_font)
-        subtitle_label.setStyleSheet("color: #E0E0E0;")
+        subtitle_label.setStyleSheet("color: palette(text);")
         layout.addWidget(subtitle_label)
         
         thesis_label = QLabel("A Thesis Project")
@@ -72,7 +74,7 @@ class SplashScreen(QWidget):
         thesis_font = QFont()
         thesis_font.setPointSize(12)
         thesis_label.setFont(thesis_font)
-        thesis_label.setStyleSheet("color: #BDBDBD;")
+        thesis_label.setStyleSheet("color: palette(text);")
         layout.addWidget(thesis_label)
         
         creators_label = QLabel("Created by: CROISSANTS")
@@ -80,7 +82,7 @@ class SplashScreen(QWidget):
         creators_font = QFont()
         creators_font.setPointSize(10)
         creators_label.setFont(creators_font)
-        creators_label.setStyleSheet("color: #9E9E9E;")
+        creators_label.setStyleSheet("color: palette(text);")
         layout.addWidget(creators_label)
         
         self.log_display = QTextEdit()
@@ -88,9 +90,9 @@ class SplashScreen(QWidget):
         self.log_display.setFixedHeight(200)
         self.log_display.setStyleSheet("""
             QTextEdit {
-                background-color: #1E1E1E;
-                color: #FFFFFF;
-                border: 1px solid #333333;
+                background-color: palette(base);
+                color: palette(text);
+                border: 1px solid palette(dark);
                 border-radius: 5px;
                 padding: 5px;
             }
@@ -104,16 +106,16 @@ class SplashScreen(QWidget):
         format = QTextCharFormat()
         
         if level == "success":
-            format.setForeground(QBrush(QColor("#4CAF50")))
+            format.setForeground(QBrush(QColor(76, 175, 80)))  # RGB for #4CAF50
             prefix = "✓"
         elif level == "warning":
-            format.setForeground(QBrush(QColor("#FFC107")))
+            format.setForeground(QBrush(QColor(255, 193, 7)))  # RGB for #FFC107
             prefix = "⚠️"
         elif level == "error":
-            format.setForeground(QBrush(QColor("#F44336")))
+            format.setForeground(QBrush(QColor(244, 67, 54)))  # RGB for #F44336
             prefix = "❌"
         else:
-            format.setForeground(QBrush(QColor("#FFFFFF")))
+            format.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
             prefix = "→"
         
         self.log_display.moveCursor(QTextCursor.MoveOperation.End)
