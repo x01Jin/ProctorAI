@@ -15,13 +15,13 @@ class ValidationDialog(QDialog):
     def setup_ui(self):
         layout = QVBoxLayout()
         
-        message = """ProctorAI requires initial setup.
-        Please configure:
-        - Roboflow API key and project
-        - Model classes (comma-separated)
-        - Database credentials
-
-        The application cannot start without these settings."""
+        message = (
+            "ProctorAI requires initial configuration:\n"
+            "• Roboflow API credentials\n"
+            "• Model class definitions\n"
+            "• Database connection settings\n\n"
+            "Application cannot start without these settings."
+        )
         label = QLabel(message)
         layout.addWidget(label)
         
