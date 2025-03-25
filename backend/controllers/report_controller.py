@@ -2,9 +2,13 @@ import os
 from backend.services.database_service import db_manager
 from backend.utils.gui_utils import GUIManager
 from fpdf import FPDF
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDateEdit, QComboBox, QPushButton, QMessageBox
+from PyQt6.QtWidgets import (
+    QDialog, QVBoxLayout, QLabel, QLineEdit, QDateEdit, 
+    QComboBox, QPushButton, QMessageBox, QHBoxLayout, QWidget
+)
 from PyQt6.QtCore import QDate
-from PyQt6.QtGui import QIntValidator
+from PyQt6.QtGui import QIntValidator, QRegularExpressionValidator
+from PyQt6.QtCore import QRegularExpression
 
 MIN_STUDENTS = 1
 MAX_STUDENTS = 1000
@@ -72,11 +76,16 @@ class PDFReport(FPDF):
         layout = QVBoxLayout(PDFReport.dialog)
         PDFReport.is_completed = False
 
-        def create_label_entry(text):
+        def create_label_entry(text, parent_layout):
+            container = QWidget()
+            container_layout = QVBoxLayout(container)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            
             label = QLabel(text)
             entry = QLineEdit()
-            layout.addWidget(label)
-            layout.addWidget(entry)
+            container_layout.addWidget(label)
+            container_layout.addWidget(entry)
+            parent_layout.addWidget(container)
             return entry
 
         def closeEvent(event):
@@ -86,28 +95,111 @@ class PDFReport(FPDF):
 
         PDFReport.dialog.closeEvent = closeEvent
 
-        entry_proctor = create_label_entry("Proctor's Name:")
-        entry_num_students = create_label_entry("Number of Students:")
+        PDFReport.dialog.setFixedWidth(320)
+
+        # Proctor Name 
+        entry_proctor = create_label_entry("Proctor's Name:", layout)
+
+        # Number of Students
+        entry_num_students = create_label_entry("Number of Students:", layout)
         validator = QIntValidator(MIN_STUDENTS, MAX_STUDENTS)
         entry_num_students.setValidator(validator)
         entry_num_students.setToolTip(NUMBER_FIELD_MESSAGE)
-        entry_block = create_label_entry("Block:")
-        entry_subject = create_label_entry("Subject:")
-        entry_room = create_label_entry("Room:")
 
-        time_options = PDFReport.get_time_options()
+        # Block inputs
+        block_widget = QWidget()
+        block_layout = QVBoxLayout(block_widget)
+        block_layout.setContentsMargins(0, 0, 0, 0)
+        block_layout.addWidget(QLabel("Block:"))
         
-        entry_start = QComboBox()
-        for display_time, _ in time_options:
-            entry_start.addItem(display_time)
-        layout.addWidget(QLabel("Start Time:"))
-        layout.addWidget(entry_start)
+        block_inputs = QWidget()
+        block_inputs_layout = QHBoxLayout(block_inputs)
+        block_inputs_layout.setContentsMargins(0, 0, 0, 0)
         
-        entry_end = QComboBox()
-        for display_time, _ in time_options:
-            entry_end.addItem(display_time)
-        layout.addWidget(QLabel("End Time:"))
-        layout.addWidget(entry_end)
+        entry_block_year = QLineEdit()
+        entry_block_year.setValidator(QRegularExpressionValidator(QRegularExpression("^[0-9]{2}$")))
+        entry_block_year.setPlaceholderText("42")
+        entry_block_year.setToolTip("Year and semester (e.g. 42 for 4th year 2nd sem)")
+        
+        entry_block_course = QLineEdit()
+        entry_block_course.setValidator(QRegularExpressionValidator(QRegularExpression("^[a-zA-Z]{2,5}$")))
+        entry_block_course.setPlaceholderText("cse")
+        entry_block_course.setToolTip("Course code (e.g. cse)")
+        
+        entry_block_number = QLineEdit()
+        entry_block_number.setValidator(QRegularExpressionValidator(QRegularExpression("^[0-9]{2}$")))
+        entry_block_number.setPlaceholderText("01")
+        entry_block_number.setToolTip("Block number (e.g. 01)")
+        
+        for widget in [entry_block_year, QLabel("-"), entry_block_course, QLabel("-"), entry_block_number]:
+            block_inputs_layout.addWidget(widget)
+        
+        block_layout.addWidget(block_inputs)
+        layout.addWidget(block_widget)
+
+        # Subject
+        entry_subject = create_label_entry("Subject:", layout)
+
+        # Room inputs
+        room_widget = QWidget()
+        room_layout = QVBoxLayout(room_widget)
+        room_layout.setContentsMargins(0, 0, 0, 0)
+        room_layout.addWidget(QLabel("Room:"))
+        
+        room_inputs = QWidget()
+        room_inputs_layout = QHBoxLayout(room_inputs)
+        room_inputs_layout.setContentsMargins(0, 0, 0, 0)
+        
+        entry_room_building = QComboBox()
+        entry_room_building.addItems(["A", "V", "L", "F", "E"])
+        
+        entry_room_number = QLineEdit()
+        entry_room_number.setValidator(QRegularExpressionValidator(QRegularExpression("^[1-9][0-9]{2}$")))
+        entry_room_number.setPlaceholderText("304")
+        entry_room_number.setToolTip("Room number: First digit (1-9) for floor, last 2 digits (01-99) for room")
+        
+        room_inputs_layout.addWidget(entry_room_building)
+        room_inputs_layout.addWidget(entry_room_number)
+        room_layout.addWidget(room_inputs)
+        layout.addWidget(room_widget)
+
+        # Time Selection
+        def create_time_inputs(label):
+            time_widget = QWidget()
+            time_layout = QVBoxLayout(time_widget)
+            time_layout.setContentsMargins(0, 0, 0, 0)
+            time_layout.addWidget(QLabel(label))
+            
+            time_inputs = QWidget()
+            time_inputs_layout = QHBoxLayout(time_inputs)
+            time_inputs_layout.setContentsMargins(0, 0, 0, 0)
+            time_inputs_layout.setSpacing(20)
+            
+            hours = QComboBox()
+            hours.addItems([f"{i:02d}" for i in range(1, 13)])
+            
+            minutes = QComboBox()
+            minutes.addItems([f"{i:02d}" for i in range(0, 60, 5)])
+            
+            period = QComboBox()
+            period.addItems(["AM", "PM"])
+            
+            colon_label = QLabel(":")
+            
+            time_inputs_layout.addWidget(hours)
+            time_inputs_layout.addWidget(colon_label)
+            time_inputs_layout.addWidget(minutes)
+            time_inputs_layout.addWidget(period)
+            time_inputs_layout.addStretch()
+            
+            time_layout.addWidget(time_inputs)
+            return time_widget, hours, minutes, period
+        
+        start_time_widget, entry_start_hour, entry_start_minute, entry_start_period = create_time_inputs("Start Time:")
+        layout.addWidget(start_time_widget)
+        
+        end_time_widget, entry_end_hour, entry_end_minute, entry_end_period = create_time_inputs("End Time:")
+        layout.addWidget(end_time_widget)
 
         entry_date = QDateEdit(calendarPopup=True)
         entry_date.setDate(QDate.currentDate())
@@ -118,17 +210,82 @@ class PDFReport(FPDF):
         layout.addWidget(submit_button)
 
         def on_submit():
+            is_valid_students, students_error = PDFReport.validate_num_students(entry_num_students.text())
+            if not is_valid_students:
+                QMessageBox.critical(PDFReport.dialog, "Error", students_error)
+                return
+
+            block_parts = [entry_block_year.text(), entry_block_course.text(), entry_block_number.text()]
+            is_valid_block, block_error = PDFReport.validate_block(*block_parts)
+            if not is_valid_block:
+                QMessageBox.critical(PDFReport.dialog, "Error", block_error)
+                return
+
+            room_parts = [entry_room_building.currentText(), entry_room_number.text()]
+            is_valid_room, room_error = PDFReport.validate_room(*room_parts)
+            if not is_valid_room:
+                QMessageBox.critical(PDFReport.dialog, "Error", room_error)
+                return
+                
             PDFReport.dialog.accept()
 
         submit_button.clicked.connect(on_submit)
         PDFReport.dialog.exec()
 
-        start_time = time_options[entry_start.currentIndex()][1]
-        end_time = time_options[entry_end.currentIndex()][1]
+        def convert_12h_to_24h(hour, minute, period):
+            hour = int(hour)
+            if period == "PM" and hour != 12:
+                hour += 12
+            elif period == "AM" and hour == 12:
+                hour = 0
+            return f"{hour:02d}:{minute}"
 
-        return (entry_proctor.text(), entry_block.text(), entry_date.date().toString("yyyy-MM-dd"),
-                entry_subject.text(), entry_room.text(), start_time, end_time,
+        start_time = convert_12h_to_24h(
+            entry_start_hour.currentText(),
+            entry_start_minute.currentText(),
+            entry_start_period.currentText()
+        )
+        
+        end_time = convert_12h_to_24h(
+            entry_end_hour.currentText(),
+            entry_end_minute.currentText(),
+            entry_end_period.currentText()
+        )
+        
+        block = f"{entry_block_year.text()}-{entry_block_course.text().lower()}-{entry_block_number.text()}"
+        room = f"{entry_room_building.currentText()}{entry_room_number.text()}"
+
+        raw_date = entry_date.date().toString("yyyy-MM-dd")
+        year, month, day = raw_date.split('-')
+        formatted_date = f"{month}-{day}-{year}"
+        
+        return (entry_proctor.text(), block, formatted_date,
+                entry_subject.text(), room, start_time, end_time,
                 entry_num_students.text())
+
+    @staticmethod
+    def validate_block(year, course, number):
+        if not year or not year.isdigit() or len(year) != 2:
+            return False, "Block year must be 2 digits"
+        if not course or not course.isalpha() or len(course) < 2 or len(course) > 5:
+            return False, "Course code must be 2-5 letters"
+        if not number or not number.isdigit() or len(number) != 2:
+            return False, "Block number must be 2 digits"
+        return True, ""
+    
+    @staticmethod
+    def validate_room(building, number):
+        if not building or building not in ["A", "V", "L", "F", "E"]:
+            return False, "Invalid building code"
+        if not number or not number.isdigit() or len(number) != 3:
+            return False, "Room number must be 3 digits"
+        floor = int(number[0])
+        room = int(number[1:])
+        if floor < 1 or floor > 9:
+            return False, "Floor must be between 1-9"
+        if room < 1 or room > 99:
+            return False, "Room number must be between 01-99"
+        return True, ""
 
     @staticmethod
     def validate_num_students(num_students_str):
