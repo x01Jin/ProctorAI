@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QToolBar
 from PyQt6.QtGui import QAction
 from config.settings_manager import SettingsManager
 from config.settings_dialog import SettingsDialog
-from backend.services.database_service import db_manager
+from backend.services.application_state import ApplicationState
 
 class ToolbarManager:
     def __init__(self, parent):
@@ -50,5 +50,8 @@ class ToolbarManager:
             theme = settings.get_setting("theme", "theme")
             self.parent.theme_manager.apply_theme(theme)
             
-            db_manager.connection = None
-            db_manager.connect()
+            app_state = ApplicationState.get_instance()
+            if app_state.database:
+                app_state.database.connection = None
+                app_state.database.connect()
+                app_state.update_connection_status(database=app_state.database.test_connection())

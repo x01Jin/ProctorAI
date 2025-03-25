@@ -1,5 +1,5 @@
 import os
-from backend.services.database_service import db_manager
+from backend.services.application_state import ApplicationState
 from backend.utils.gui_utils import GUIManager
 from fpdf import FPDF
 from PyQt6.QtWidgets import (
@@ -336,7 +336,11 @@ class PDFReport(FPDF):
         proctor, block, date, subject, room, start, end, num_students = details
 
         try:
-            db_manager.insert_report_details(proctor, block, date, subject, room, start, end, num_students)
+            app_state = ApplicationState.get_instance()
+            if app_state.database:
+                app_state.database.insert_report_details(proctor, block, date, subject, room, start, end, num_students)
+            else:
+                raise ValueError("Database connection not initialized")
         except ValueError as e:
             QMessageBox.critical(PDFReport.dialog, "Error", str(e))
             return False

@@ -1,21 +1,44 @@
 import mysql.connector
 from mysql.connector import Error
-import logging
 from config.database_config import DB_CONFIG
 
 class DatabaseManager:
+    last_error = None
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = DatabaseManager()
+        return cls._instance
+    
     def __init__(self):
+        if DatabaseManager._instance is not None:
+            raise Exception("DatabaseManager is a singleton!")
         self.connection = None
-        self.connect()
-
+    
+    def test_connection(self):
+        try:
+            self.connect()
+            if self.connection and self.connection.is_connected():
+                return True
+            return False
+        except Error:
+            return False
+        finally:
+            if self.connection and self.connection.is_connected():
+                self.connection.close()
+                self.connection = None
+    
     def connect(self):
         try:
             self.connection = mysql.connector.connect(**DB_CONFIG)
             if self.connection.is_connected():
-                logging.info("Connection to MySQL database successful")
+                return True
         except Error as e:
-            logging.error(f"Error connecting to MySQL: {e}")
+            DatabaseManager.last_error = str(e)
             self.connection = None
+        return False
 
     def ensure_connection(self):
         if self.connection is None or not self.connection.is_connected():
@@ -24,7 +47,7 @@ class DatabaseManager:
     def insert_report_details(self, proctor, block, date, subject, room, start, end, num_students):
         self.ensure_connection()
         if self.connection is None:
-            logging.error("Failed to insert report details: No database connection")
+            DatabaseManager.last_error = "No database connection"
             return
 
         try:
@@ -41,10 +64,9 @@ class DatabaseManager:
             cursor.execute(query, values)
             self.connection.commit()
             cursor.close()
-            logging.info("Report details inserted successfully")
         except Error as e:
-            logging.error(f"Error inserting report details: {e}")
+            DatabaseManager.last_error = str(e)
 
-logging.basicConfig(level=logging.INFO)
 
-db_manager = DatabaseManager()
+def get_database():
+    return DatabaseManager.get_instance()

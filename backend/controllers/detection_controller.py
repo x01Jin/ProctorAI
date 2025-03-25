@@ -54,7 +54,7 @@ class DetectionManager(QObject):
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         confidence_threshold = self.main_window.detection_controls.get_confidence_threshold()
 
-        if not GUIManager.connection():
+        if not GUIManager.check_internet_status():
             print("Connection Error. Retrying.")
             self.connection_status_changed.emit(False)
             QThread.sleep(3)

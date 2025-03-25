@@ -3,34 +3,35 @@ from PyQt6.QtCore import Qt
 import cv2
 import os
 import requests
-from backend.services.database_service import db_manager
+from backend.services.application_state import ApplicationState
 from frontend.components.image_label import ImageLabel
 
 class GUIManager:
     @staticmethod
     def update_status(internet_status_label, database_status_label):
-        GUIManager.update_internet_status(internet_status_label)
-        GUIManager.update_database_status(database_status_label)
+        internet_status = GUIManager.check_internet_status()
+        database_status = GUIManager.check_database_status()
+        
+        app_state = ApplicationState.get_instance()
+        app_state.update_connection_status(internet=internet_status, database=database_status)
+        
+        internet_status_label.setText(f"Internet: {'Connected' if internet_status else 'Disconnected'}")
+        database_status_label.setText(f"Database: {'Connected' if database_status else 'Disconnected'}")
 
     @staticmethod
-    def update_internet_status(internet_status_label):
-        internet_status = "Connected" if GUIManager.connection() else "Disconnected"
-        internet_status_label.setText(f"Internet: {internet_status}")
-
-    @staticmethod
-    def update_database_status(database_status_label):
-        if db_manager.connection is None or not db_manager.connection.is_connected():
-            db_manager.connect()
-        database_status = "Connected" if db_manager.connection and db_manager.connection.is_connected() else "Disconnected"
-        database_status_label.setText(f"Database: {database_status}")
-
-    @staticmethod
-    def connection():
+    def check_internet_status():
         try:
-            requests.get("http://www.google.com", timeout=3)
+            requests.get("http://google.com", timeout=1)
             return True
-        except requests.ConnectionError:
+        except requests.exceptions.RequestException:
             return False
+
+    @staticmethod
+    def check_database_status():
+        app_state = ApplicationState.get_instance()
+        if not app_state.database:
+            return False
+        return app_state.database.test_connection()
 
     @staticmethod
     def capture_image(detection, current_image, window):

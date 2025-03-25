@@ -61,7 +61,7 @@ class CameraManager(QObject):
         else:
             print("Selected camera is not available.")
 
-    def stop_camera(self):
+    def _release_resources(self):
         self.camera_active = False
         if self.camera_thread and self.camera_thread.isRunning():
             self.camera_thread.stop()
@@ -69,14 +69,15 @@ class CameraManager(QObject):
         if self.cap and self.cap.isOpened():
             self.cap.release()
             self.cap = None
-        self.clear_display()
+        try:
+            if hasattr(self, 'main_window') and self.main_window and hasattr(self.main_window, 'camera_display'):
+                self.main_window.camera_display.display_label.clear()
+                self.main_window.camera_display.display_label.setStyleSheet("background-color: black; border: 2px solid #444444;")
+        except RuntimeError:
+            pass
 
-    def clear_display(self):
-        self.main_window.camera_display.display_label.clear()
-        self.main_window.camera_display.display_label.setStyleSheet("background-color: black; border: 2px solid #444444;")
-
-    def __del__(self):
-        self.stop_camera()
+    def stop_camera(self):
+        self._release_resources()
 
     def cleanup(self):
-        self.stop_camera()
+        self._release_resources()
