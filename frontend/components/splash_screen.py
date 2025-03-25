@@ -4,6 +4,8 @@ from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor
 import time
 import urllib.request
 from backend.services.application_state import ApplicationState
+from config.settings_manager import SettingsManager
+from config.settings_dialog import SettingsDialog
 
 class SplashScreen(QWidget):
     def __init__(self, parent=None):
@@ -121,21 +123,25 @@ class SplashScreen(QWidget):
         time.sleep(0.5)
 
     def check_config(self):
-        from config.settings_manager import SettingsManager
         self.log_message("Checking configuration...")
         QApplication.processEvents()
         time.sleep(1)
-        try:
-            settings = SettingsManager()
-            settings.validate_settings()
-            self.log_message("Configuration found and valid", "success")
+        
+        settings = SettingsManager()
+        if not settings.config_exists():
+            self.log_message("No configuration file found...", "warning")
+            self.log_message("Creating configuration file with default values...")
+            settings.create_default_config()
+            self.log_message("Configuration file created... launching setup...", "info")
+            
+            # Show settings dialog
+            settings_dialog = SettingsDialog(settings, parent=self, setup_mode=True)
+            if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
+                self.log_message("Setup cancelled... proceeding anyway...", "warning")
             return True
-        except ValueError:
-            self.log_message("No configuration found", "warning")
-            return False
-        except Exception as e:
-            self.log_message(f"Error checking configuration: {str(e)}", "error")
-            return False
+            
+        self.log_message("Configuration found", "success")
+        return True
 
     def check_internet(self, retry_count=3):
         app_state = ApplicationState.get_instance()
@@ -153,6 +159,8 @@ class SplashScreen(QWidget):
                     self.log_message(f"Internet connection failed ({str(e)}), retrying... ({attempt + 1}/{retry_count})", "warning")
                 else:
                     self.log_message(f"Internet connection failed after 3 attempts: {str(e)}", "error")
+                    self.log_message("Internet connection failed... proceeding anyway...", "warning")
+                    self.log_message("Some features may be limited without internet connection", "warning")
                     app_state.update_connection_status(internet=False)
                     return False
 
@@ -166,13 +174,13 @@ class SplashScreen(QWidget):
         time.sleep(1)
         for attempt in range(retry_count):
             try:
-                self.log_message("loading Roboflow workspace...")
-                QApplication.processEvents()
-                time.sleep(1)
-                self.log_message("loading Roboflow project...")
-                QApplication.processEvents()
-                time.sleep(1)
                 if rf.initialize():
+                    self.log_message("loading Roboflow workspace...")
+                    QApplication.processEvents()
+                    time.sleep(1)
+                    self.log_message("loading Roboflow project...")
+                    QApplication.processEvents()
+                    time.sleep(1)
                     self.log_message("Roboflow connection established", "success")
                     app_state.update_connection_status(roboflow=True)
                     return True
@@ -181,9 +189,17 @@ class SplashScreen(QWidget):
                 if attempt < retry_count - 1:
                     self.log_message(f"Roboflow connection failed: {str(e)}, retrying... ({attempt + 1}/{retry_count})", "warning")
                 else:
-                    self.log_message(f"Roboflow connection failed after 3 attempts: {str(e)}", "error")
-                    app_state.update_connection_status(roboflow=False)
-                    return False
+                    self.log_message("Opening setup to check the Roboflow settings...", "warning")
+                    
+                    settings_dialog = SettingsDialog(SettingsManager(), parent=self, setup_mode=True, setup_type="roboflow")
+                    if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
+                        self.log_message("Roboflow setup cancelled... exiting the application...", "error")
+                        app_state.update_connection_status(roboflow=False)
+                        QTimer.singleShot(1000, lambda: QApplication.instance().quit())
+                        return False
+                    
+                    # Try to connect again after settings update
+                    return self.check_roboflow(retry_count)
 
     def check_database(self, retry_count=3):
         app_state = ApplicationState.get_instance()
@@ -204,9 +220,17 @@ class SplashScreen(QWidget):
                 if attempt < retry_count - 1:
                     self.log_message(f"Database connection failed: {str(e)}, retrying... ({attempt + 1}/{retry_count})", "warning")
                 else:
-                    self.log_message(f"Database connection failed after 3 attempts: {str(e)}", "error")
-                    app_state.update_connection_status(database=False)
-                    return False
+                    self.log_message("Opening setup to check the database settings...", "warning")
+                    
+                    settings_dialog = SettingsDialog(SettingsManager(), parent=self, setup_mode=True, setup_type="database")
+                    if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
+                        self.log_message("Database setup cancelled... exiting the application...", "error")
+                        app_state.update_connection_status(database=False)
+                        QTimer.singleShot(1000, lambda: QApplication.instance().quit())
+                        return False
+                    
+                    # Try to connect again after settings update
+                    return self.check_database(retry_count)
 
     def perform_checks(self, on_complete=None):
         config_ok = self.check_config()

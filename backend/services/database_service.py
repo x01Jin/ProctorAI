@@ -1,6 +1,6 @@
 import mysql.connector
 from mysql.connector import Error
-from config.database_config import DB_CONFIG
+from config.settings_manager import SettingsManager
 
 class DatabaseManager:
     last_error = None
@@ -16,6 +16,26 @@ class DatabaseManager:
         if DatabaseManager._instance is not None:
             raise Exception("DatabaseManager is a singleton!")
         self.connection = None
+        self.settings = SettingsManager()
+    
+    def get_db_config(self):
+        db_settings = self.settings.get_setting('database')
+        if not db_settings:
+            DatabaseManager.last_error = "Database settings not found"
+            return None
+            
+        required_fields = ['host', 'user', 'database']
+        for field in required_fields:
+            if not db_settings.get(field):
+                DatabaseManager.last_error = f"Missing required database setting: {field}"
+                return None
+                
+        return {
+            'host': db_settings['host'],
+            'user': db_settings['user'],
+            'password': db_settings.get('password', ''),
+            'database': db_settings['database']
+        }
     
     def test_connection(self):
         try:
@@ -23,7 +43,8 @@ class DatabaseManager:
             if self.connection and self.connection.is_connected():
                 return True
             return False
-        except Error:
+        except Error as e:
+            DatabaseManager.last_error = str(e)
             return False
         finally:
             if self.connection and self.connection.is_connected():
@@ -32,7 +53,11 @@ class DatabaseManager:
     
     def connect(self):
         try:
-            self.connection = mysql.connector.connect(**DB_CONFIG)
+            db_config = self.get_db_config()
+            if not db_config:
+                return False
+                
+            self.connection = mysql.connector.connect(**db_config)
             if self.connection.is_connected():
                 return True
         except Error as e:
@@ -66,7 +91,6 @@ class DatabaseManager:
             cursor.close()
         except Error as e:
             DatabaseManager.last_error = str(e)
-
 
 def get_database():
     return DatabaseManager.get_instance()

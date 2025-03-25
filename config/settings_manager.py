@@ -37,26 +37,32 @@ class SettingsManager:
                 'database': 'REQUIRED'
             }
         }
+
+        if self.config_exists():
+            self._settings_data = self.load_settings()
+    
+    def config_exists(self):
+        return Path(self.settings_file).exists()
         
-        self._settings_data = self.load_settings()
+    def create_default_config(self):
+        settings = self._default_settings.copy()
+        for section, values in settings.items():
+            if section not in self.config:
+                self.config[section] = {}
+            for key, value in values.items():
+                self.config[section][key] = str(value)
+        
+        with open(self.settings_file, 'w') as f:
+            self.config.write(f)
+        
+        self._settings_data = settings
+        return settings
     
     def load_settings(self):
         settings = self._default_settings.copy()
-        
-        if Path(self.settings_file).exists():
-            self.config.read(self.settings_file)
-            for section in self.config.sections():
-                settings[section] = dict(self.config[section])
-        else:
-            for section, values in settings.items():
-                if section not in self.config:
-                    self.config[section] = {}
-                for key, value in values.items():
-                    self.config[section][key] = str(value)
-            
-            with open(self.settings_file, 'w') as f:
-                self.config.write(f)
-            
+        self.config.read(self.settings_file)
+        for section in self.config.sections():
+            settings[section] = dict(self.config[section])
         return settings
     
     def save_settings(self):

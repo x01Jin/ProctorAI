@@ -3,13 +3,20 @@ from PyQt6.QtWidgets import (
     QFormLayout, QComboBox, QLabel, QLineEdit,
     QSpinBox, QPushButton, QMessageBox
 )
+from PyQt6.QtCore import Qt
 
 class SettingsDialog(QDialog):
-    def __init__(self, settings, parent=None):
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        
+    def __init__(self, settings, parent=None, setup_mode=False, setup_type=None):
         super().__init__(parent)
         self.settings = settings
-        self.setWindowTitle("Settings")
+        self.setup_mode = setup_mode
+        self.setup_type = setup_type
+        self.setWindowTitle("Setup" if setup_mode else "Settings")
         self.setModal(True)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         self.setup_ui()
         
     def setup_ui(self):
@@ -95,7 +102,7 @@ class SettingsDialog(QDialog):
         save_btn.clicked.connect(self._save_settings)
         
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.clicked.connect(self.reject)
+        cancel_btn.clicked.connect(self._handle_cancel)
         
         layout.addWidget(save_btn)
         layout.addWidget(cancel_btn)
@@ -126,6 +133,25 @@ class SettingsDialog(QDialog):
     def _show_error(self, message):
         QMessageBox.critical(self, "Validation Error", message)
     
+    def _handle_cancel(self):
+        if self.setup_mode:
+            msg = "Are you sure you want to cancel the setup?"
+            if self.setup_type in ["roboflow", "database"]:
+                msg = "Cancelling the setup will exit the application"
+            
+            reply = QMessageBox.question(
+                self,
+                "Confirm Cancel",
+                msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.reject()
+        else:
+            self.reject()
+
     def _save_settings(self):
         if not self._validate_inputs():
             return
@@ -144,6 +170,15 @@ class SettingsDialog(QDialog):
             self.settings.update_setting("database", "database", self.db_name.text().strip())
             
             self.settings.save_settings()
+            
+            # Show success message in setup mode
+            if self.setup_mode:
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"{'Initial setup' if not self.setup_type else self.setup_type.capitalize() + ' setup'} completed successfully!"
+                )
+            
             self.accept()
             
         except Exception as e:
