@@ -6,11 +6,10 @@ import sys
 def setup_logging():
     try:
         if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
+            base_dir = os.path.dirname(sys.executable)
         else:
-            base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        
-        log_dir = os.path.join(os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else base_path), "logs")
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        log_dir = os.path.join(base_dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
     
         log_format = '%(asctime)s - %(name)s - [%(filename)s:%(lineno)d] - %(levelname)s - %(message)s'
@@ -24,7 +23,7 @@ def setup_logging():
         main_handler.setFormatter(logging.Formatter(log_format))
         
         # Configure component-specific loggers
-        components = ['camera', 'detection', 'report', 'database']
+        components = ['camera', 'detection', 'report', 'database', 'roboflow']
         for component in components:
             handler = RotatingFileHandler(
                 os.path.join(log_dir, f"{component}.log"),
@@ -35,6 +34,8 @@ def setup_logging():
             component_logger = logging.getLogger(component)
             if component == 'database':
                 component_logger.setLevel(logging.INFO)
+            elif component in ['roboflow', 'detection']:
+                component_logger.setLevel(logging.DEBUG)
             else:
                 component_logger.setLevel(logging.ERROR)
             component_logger.addHandler(handler)

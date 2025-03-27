@@ -1,13 +1,19 @@
 from PyQt6.QtWidgets import QToolBar
 from PyQt6.QtGui import QAction
+from PyQt6.QtCore import QObject, pyqtSignal
 from config.settings_manager import SettingsManager
 from config.settings_dialog import SettingsDialog
 from backend.services.application_state import ApplicationState
 
-class ToolbarManager:
+class ToolbarManager(QObject):
+    settings_updated = pyqtSignal()
+    
     def __init__(self, parent):
+        super().__init__(parent)
         self.parent = parent
         self.toolbar = QToolBar("Main Toolbar")
+        self.settings = SettingsManager()
+        self.settings_dialog = SettingsDialog(self.settings, parent)
         parent.addToolBar(self.toolbar)
         self.setup_actions()
 
@@ -44,10 +50,8 @@ class ToolbarManager:
         )
 
     def show_settings(self):
-        settings = SettingsManager()
-        dialog = SettingsDialog(settings, self.parent)
-        if dialog.exec() == SettingsDialog.DialogCode.Accepted:
-            theme = settings.get_setting("theme", "theme")
+        if self.settings_dialog.exec() == SettingsDialog.DialogCode.Accepted:
+            theme = self.settings.get_setting("theme", "theme")
             self.parent.theme_manager.apply_theme(theme)
             
             app_state = ApplicationState.get_instance()
@@ -55,3 +59,5 @@ class ToolbarManager:
                 app_state.database.connection = None
                 app_state.database.connect()
                 app_state.update_connection_status(database=app_state.database.test_connection())
+            
+            self.settings_updated.emit()

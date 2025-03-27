@@ -4,8 +4,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-MODEL_CLASSES = ["cheating", "not_cheating"]
-
 class DetectionControlsDock(QDockWidget):
     detection_toggle_requested = pyqtSignal()
     confidence_changed = pyqtSignal(float)
@@ -44,7 +42,6 @@ class DetectionControlsDock(QDockWidget):
 
     def setup_capture_combo(self, layout):
         self.capture_class_combo = QComboBox()
-        self.capture_class_combo.addItems(MODEL_CLASSES)
         layout.addWidget(QLabel("Capture:"))
         layout.addWidget(self.capture_class_combo)
         self.capture_class_combo.currentTextChanged.connect(self.capture_class_changed.emit)
@@ -76,6 +73,19 @@ class DetectionControlsDock(QDockWidget):
     def update_confidence_label(self, value):
         self.confidence_label.setText(f"{value}%")
         self.confidence_changed.emit(value / 100.0)
+
+    def update_model_classes(self, classes):
+        # Update capture class combo box
+        current_text = self.capture_class_combo.currentText()
+        self.capture_class_combo.clear()
+        if classes:
+            self.capture_class_combo.addItems(classes)
+            # Restore previous selection if it exists in new classes
+            if current_text in classes:
+                self.capture_class_combo.setCurrentText(current_text)
+        
+        # Update filter combo box
+        self.populate_filter_selection(classes)
 
     def populate_filter_selection(self, classes):
         self.filter_combo.clear()

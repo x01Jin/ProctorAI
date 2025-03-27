@@ -3,10 +3,11 @@ from PyQt6.QtWidgets import (
     QFormLayout, QComboBox, QLabel, QLineEdit,
     QSpinBox, QPushButton, QMessageBox
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from frontend.themes.theme_manager import ThemeManager
 
 class SettingsDialog(QDialog):
+    settings_updated = pyqtSignal()
     def __init__(self, settings, parent=None, setup_mode=False, setup_type=None):
         super().__init__(parent)
         self.settings = settings
@@ -197,6 +198,7 @@ class SettingsDialog(QDialog):
                     f"{'Initial setup' if not self.setup_type else self.setup_type.capitalize() + ' setup'} completed successfully!"
                 )
             
+            self.settings_updated.emit()
             self.accept()
             
         except Exception as e:

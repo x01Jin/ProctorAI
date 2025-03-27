@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer
 import sys
+import logging
 from backend.controllers.camera_controller import CameraManager
 from backend.controllers.detection_controller import DetectionManager
 from config.settings_manager import SettingsManager
@@ -67,17 +68,42 @@ class MainWindow(QMainWindow):
     def setup_components(self):
         self.status_bar = StatusBarManager(self)
         self.toolbar = ToolbarManager(self)
+        self.toolbar.settings_updated.connect(self.on_settings_updated)
         
     def setup_model(self):
-        # Get initialized Roboflow instance
-        rf = self.app_state.roboflow
-        if rf is None or not rf.model:
-            QMessageBox.critical(self, "Error", "Roboflow model not initialized.")
-            sys.exit(1)
+        try:
+            # Get initialized Roboflow instance
+            rf = self.app_state.roboflow
+            if rf is None or not rf.model:
+                QMessageBox.critical(self, "Error", "Roboflow model not initialized.")
+                sys.exit(1)
 
-        self.camera_manager = CameraManager(self)
-        self.detection_manager = DetectionManager(rf.model, self)
-        self.detection_controls.populate_filter_selection(rf.classes)
+            # Validate model classes
+            if not rf.classes:
+                self.handle_model_error("No model classes available in settings.")
+                return
+                
+            # Remove any empty classes after splitting
+            valid_classes = [cls.strip() for cls in rf.classes if cls.strip()]
+            if not valid_classes:
+                self.handle_model_error("No valid model classes found after parsing.")
+                return
+
+            # Create camera and detection managers first
+            self.camera_manager = CameraManager(self)
+            self.detection_manager = DetectionManager(rf.model, self)
+
+            # Only update UI controls after successful manager initialization
+            self.detection_controls.update_model_classes(valid_classes)
+
+        except Exception as e:
+            self.handle_model_error(str(e))
+            
+    def handle_model_error(self, error_msg):
+        full_msg = f"Failed to setup model and controls: {error_msg}"
+        logging.getLogger('detection').error(full_msg)
+        QMessageBox.critical(self, "Setup Error", full_msg)
+        sys.exit(1)
 
     def connect_signals(self):
         self.camera_manager.frame_ready.connect(self.camera_display.update_display)
@@ -103,10 +129,19 @@ class MainWindow(QMainWindow):
         PDFReport.save_pdf()
 
     def process_detections(self, detections):
-        self.status_bar.update_detections_count(len(detections))
-        for detection in detections:
-            if detection['class'] == self.get_selected_capture_class():
-                GUIManager.capture_image(detection, self.camera_manager.current_image, self)
+        try:
+            selected_class = self.get_selected_capture_class()
+            if not selected_class:
+                logging.getLogger('detection').error("No capture class selected")
+                return
+
+            self.status_bar.update_detections_count(len(detections))
+            for detection in detections:
+                if detection['class'] == selected_class:
+                    logging.getLogger('detection').info(f"Capturing image for {detection['class']} (confidence: {int(detection['confidence']*100)}%)")
+                    GUIManager.capture_image(detection, self.camera_manager.current_image, self)
+        except Exception as e:
+            logging.getLogger('detection').error(f"Error processing detections: {str(e)}")
 
     def closeEvent(self, event):
         reply = QMessageBox.question(
@@ -145,6 +180,21 @@ class MainWindow(QMainWindow):
             internet=internet_status,
             database=database_status
         )
+
+    def on_settings_updated(self):
+        # Stop detection if running
+        if hasattr(self, 'detection_manager') and self.detection_manager:
+            self.detection_manager.toggle_detection(force_stop=True)
+            
+        # Reinitialize Roboflow model
+        self.app_state.initialize_roboflow()
+        rf = self.app_state.roboflow
+        
+        # Update UI components with new model classes
+        if rf and rf.model:
+            self.detection_controls.update_model_classes(rf.classes)
+        else:
+            QMessageBox.critical(self, "Error", "Failed to initialize Roboflow model.")
 
     def cleanup(self):
         if hasattr(self, 'camera_manager'):
