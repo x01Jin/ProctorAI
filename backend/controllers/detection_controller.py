@@ -115,14 +115,21 @@ class DetectionManager(QObject):
                 
                 self.connection_status_changed.emit(True)
                 return predictions
-                
-            except requests.exceptions.ConnectionError:
-                self.logger.error("Connection error during prediction, retrying...")
-                self.connection_status_changed.emit(False)
-                QThread.sleep(3)
-                return self.process_image(image)
+            except requests.exceptions.RequestException as e:
+                self.logger.error(f"Network error during prediction: {str(e)}")
+                if isinstance(e, requests.exceptions.HTTPError):
+                    if "401" in str(e):
+                        self.logger.error("Authentication error - please check API key")
+                    elif "404" in str(e):
+                        self.logger.error("Project or model version not found")
+                    self.stop_detection()
+                elif isinstance(e, requests.exceptions.ConnectionError):
+                    self.logger.error("Connection error - check internet connection")
+                    self.connection_status_changed.emit(False)
+                return []
             except Exception as e:
-                self.logger.error(f"Error during prediction: {str(e)}")
+                self.logger.error(f"Unexpected error during prediction: {str(e)}")
+                self.stop_detection()
                 return []
         except Exception as e:
             self.logger.error(f"Failed to process image: {str(e)}")

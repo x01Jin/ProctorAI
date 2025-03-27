@@ -33,9 +33,19 @@ class ApplicationState:
         if self._db_instance is None:
             self._db_instance = DatabaseManager.get_instance()
             
-    def initialize_roboflow(self) -> None:
+    def initialize_roboflow(self) -> bool:
         if self._rf_instance is None:
             self._rf_instance = RoboflowManager.get_instance()
+        return self._rf_instance.initialize()
+
+    def reinitialize_roboflow(self) -> bool:
+        """Reinitialize Roboflow with new settings."""
+        if self._rf_instance:
+            self._rf_instance = None  # Clear the instance to force reinitialization
+        self.initialize_roboflow()  # This will create a new instance
+        if self._rf_instance and self._rf_instance.initialize():
+            return True
+        return False
     
     def update_connection_status(self, internet=None, database=None, roboflow=None):
         if internet is not None:
