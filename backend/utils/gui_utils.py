@@ -103,7 +103,22 @@ class GUIManager:
 
             class_name = detection['class']
             confidence = detection['confidence']
-            color = (0, 255, 0) if class_name == "not_cheating" else (255, 0, 0)
+            
+            CLASS_COLORS = {
+                0: (0, 165, 255),   # Orange
+                1: (255, 0, 128),   # Purple
+                2: (255, 255, 0),   # Cyan
+                3: (0, 255, 255),   # Yellow
+                4: (203, 192, 255), # Pink
+                5: (42, 42, 165),   # Brown
+                6: (250, 230, 230), # Lavender
+                7: (208, 224, 64),  # Turquoise
+                8: (214, 112, 218), # Orchid
+                9: (180, 130, 70),  # Steel Blue
+            }
+            
+            color_index = hash(class_name) % 10
+            color = CLASS_COLORS[color_index]
 
             cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
             label_text = class_name if window.detection_controls.display_mode_combo.currentText() == "draw_labels" else f"{(confidence * 100):.0f}%"
