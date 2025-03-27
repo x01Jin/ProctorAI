@@ -1,5 +1,4 @@
 from PyQt6.QtWidgets import QLabel, QInputDialog, QMenu, QMessageBox
-from PyQt6.QtGui import QPainter
 from PyQt6.QtCore import Qt
 import os
 
@@ -77,10 +76,3 @@ class ImageLabel(QLabel):
             elided_text = metrics.elidedText(self.filename_label.text(), Qt.TextElideMode.ElideRight, int(max_width))
             self.filename_label.setText(elided_text)
         self.filename_label.adjustSize()
-
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        if self.toolTip():
-            painter = QPainter(self)
-            painter.setPen(Qt.GlobalColor.red)
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter, self.toolTip())
