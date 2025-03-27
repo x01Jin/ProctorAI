@@ -1,10 +1,12 @@
 import mysql.connector
 from mysql.connector import Error
+import logging
 from config.settings_manager import SettingsManager
 
 class DatabaseManager:
     last_error = None
     _instance = None
+    logger = logging.getLogger('database')
     
     @classmethod
     def get_instance(cls):
@@ -22,12 +24,15 @@ class DatabaseManager:
         db_settings = self.settings.get_setting('database')
         if not db_settings:
             DatabaseManager.last_error = "Database settings not found"
+            self.logger.error("Database settings not found")
             return None
             
         required_fields = ['host', 'user', 'database']
         for field in required_fields:
             if not db_settings.get(field):
-                DatabaseManager.last_error = f"Missing required database setting: {field}"
+                error_msg = f"Missing required database setting: {field}"
+                DatabaseManager.last_error = error_msg
+                self.logger.error(error_msg)
                 return None
                 
         return {
@@ -44,7 +49,9 @@ class DatabaseManager:
                 return True
             return False
         except Error as e:
-            DatabaseManager.last_error = str(e)
+            error_msg = str(e)
+            DatabaseManager.last_error = error_msg
+            self.logger.error(f"Connection test failed: {error_msg}")
             return False
         finally:
             if self.connection and self.connection.is_connected():
@@ -59,23 +66,33 @@ class DatabaseManager:
                 
             self.connection = mysql.connector.connect(**db_config)
             if self.connection.is_connected():
+                db_info = self.connection.get_server_info()
+                session_id = self.connection.connection_id
+                self.logger.info(f"Successfully connected to MySQL database (Server: {db_info}, Session ID: {session_id})")
                 return True
         except Error as e:
-            DatabaseManager.last_error = str(e)
+            error_msg = str(e)
+            DatabaseManager.last_error = error_msg
+            self.logger.error(f"Error connecting to MySQL: {error_msg}")
             self.connection = None
         return False
 
     def ensure_connection(self):
         if self.connection is None or not self.connection.is_connected():
+            self.logger.info("Attempting to reconnect...")
             self.connect()
 
     def insert_report_details(self, proctor, block, date, subject, room, start, end, num_students):
         self.ensure_connection()
         if self.connection is None:
-            DatabaseManager.last_error = "No database connection"
+            error_msg = "No database connection"
+            DatabaseManager.last_error = error_msg
+            self.logger.error(f"Failed to insert report details: {error_msg}")
             return
 
         try:
+            session_id = self.connection.connection_id
+            self.logger.info(f"Beginning report details insert (Session ID: {session_id})")
             cursor = self.connection.cursor()
             query = """
             INSERT INTO reportlog (proctor, num_students, block, subject, room, start, end, date)
@@ -89,8 +106,11 @@ class DatabaseManager:
             cursor.execute(query, values)
             self.connection.commit()
             cursor.close()
+            self.logger.info(f"Report details inserted successfully (Session ID: {session_id}, Last Row ID: {cursor.lastrowid})")
         except Error as e:
-            DatabaseManager.last_error = str(e)
+            error_msg = str(e)
+            DatabaseManager.last_error = error_msg
+            self.logger.error(f"Error inserting report details (Session ID: {session_id if self.connection else 'None'}): {error_msg}")
 
 def get_database():
     return DatabaseManager.get_instance()

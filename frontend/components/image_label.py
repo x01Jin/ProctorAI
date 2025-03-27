@@ -4,12 +4,13 @@ from PyQt6.QtCore import Qt
 import os
 
 class ImageLabel(QLabel):
-    def __init__(self, image_path, parent=None):
+    def __init__(self, image_path, parent=None, filename_label=None):
         super().__init__(parent)
         self.image_path = image_path
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.tag = ""
+        self.filename_label = filename_label
 
     def show_context_menu(self, pos):
         context_menu = QMenu(self)
@@ -62,6 +63,20 @@ class ImageLabel(QLabel):
 
         os.rename(self.image_path, new_filepath)
         self.image_path = new_filepath
+        if self.filename_label:
+            self.filename_label.setText(self.tag)
+            self.update_filename_label_width()
+
+    def update_filename_label_width(self):
+        if not self.filename_label:
+            return
+        metrics = self.filename_label.fontMetrics()
+        text_width = metrics.horizontalAdvance(self.filename_label.text())
+        max_width = self.window().width() * 0.8
+        if text_width > max_width:
+            elided_text = metrics.elidedText(self.filename_label.text(), Qt.TextElideMode.ElideRight, int(max_width))
+            self.filename_label.setText(elided_text)
+        self.filename_label.adjustSize()
 
     def paintEvent(self, event):
         super().paintEvent(event)

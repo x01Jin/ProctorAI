@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QSplitter, QMessageBox
+    QMainWindow, QWidget, QSplitter, QMessageBox, QDockWidget
 )
 from PyQt6.QtCore import Qt, QTimer
 import sys
@@ -19,13 +19,17 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ProctorAI")
-        self.resize(1280, 720)
-        screen = self.screen().availableGeometry()
-        window_geometry = self.frameGeometry()
-        center_point = screen.center()
-        window_geometry.moveCenter(center_point)
-        self.move(window_geometry.topLeft())
         
+        # Calculate 90% of screen size for window dimensions
+        screen = self.screen().availableGeometry()
+        width = int(screen.width() * 0.9)
+        height = int(screen.height() * 0.9)
+        self.resize(width, height)
+        
+        # Center window on screen
+        self.move((screen.width() - width) // 2,
+                 (screen.height() - height) // 2)
+                 
         # Initialize ApplicationState first
         self.app_state = ApplicationState.get_instance()
         
@@ -38,18 +42,27 @@ class MainWindow(QMainWindow):
         self.setup_connection_monitor()
         
     def setup_window(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        
-        self.camera_display = CameraDisplayDock("Camera and Display", self)
-        self.report_manager = ReportManagerDock("Captured Images", self)
-        self.detection_controls = DetectionControlsDock("Detection Controls", self)
+        try:
+            central_widget = QWidget()
+            self.setCentralWidget(central_widget)
+            
+            self.camera_display = CameraDisplayDock("Camera and Display", self)
+            self.camera_display.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
+            
+            self.report_manager = ReportManagerDock("Captured Images", self)
+            self.report_manager.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
+            
+            self.detection_controls = DetectionControlsDock("Detection Controls", self)
+            self.detection_controls.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self.camera_display)
-        splitter.addWidget(self.report_manager)
-        self.setCentralWidget(splitter)
-        self.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, self.detection_controls)
+            splitter = QSplitter(Qt.Orientation.Horizontal)
+            splitter.addWidget(self.camera_display)
+            splitter.addWidget(self.report_manager)
+            self.setCentralWidget(splitter)
+            self.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, self.detection_controls)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to setup window: {str(e)}")
+            sys.exit(1)
 
     def setup_components(self):
         self.status_bar = StatusBarManager(self)

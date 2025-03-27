@@ -1,6 +1,9 @@
 /.venv
 /build
 /dist
+/logs
+/proctorai-alpha
+/proctorai-beta
 proctorai.spec
 experiment.py
 1OIDspec.py

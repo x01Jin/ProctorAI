@@ -1,4 +1,6 @@
 import os
+import logging
+import traceback
 from backend.services.application_state import ApplicationState
 from backend.utils.gui_utils import GUIManager
 from fpdf import FPDF
@@ -17,6 +19,11 @@ REPORT_DIR_NAME = "ProctorAI-Report"
 NUMBER_FIELD_MESSAGE = "You can only put numbers here"
 
 class PDFReport(FPDF):
+    def __init__(self):
+        super().__init__()
+        self.logger = logging.getLogger('report')
+        self.logger.info("Initializing PDFReport")
+
     def header(self):
         self.set_font("Arial", 'B', 20)
         self.cell(0, 5, "Proctor AI", ln=True, align='C')
@@ -64,10 +71,14 @@ class PDFReport(FPDF):
 
     @staticmethod
     def prompt_report_details():
+        logger = logging.getLogger('report')
+        logger.info("Starting report details prompt")
+        
         desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
         report_dir = os.path.join(desktop_path, REPORT_DIR_NAME)
         if not os.path.exists(report_dir):
             os.makedirs(report_dir)
+            logger.info(f"Created report directory: {report_dir}")
 
         PDFReport.dialog = QDialog()
         PDFReport.dialog.setWindowTitle("Report Details")
@@ -255,6 +266,7 @@ class PDFReport(FPDF):
 
         submit_button.clicked.connect(on_submit)
         if not PDFReport.dialog.exec():
+            logger.info("Report generation cancelled")
             return None
 
         def convert_12h_to_24h(hour, minute, period):
@@ -284,6 +296,7 @@ class PDFReport(FPDF):
         year, month, day = raw_date.split('-')
         formatted_date = f"{month}-{day}-{year}"
         
+        logger.info(f"Report details collected: Block={block}, Subject={entry_subject.text()}, Room={room}")
         return (entry_proctor.text(), block, formatted_date,
                 entry_subject.text(), room, start_time, end_time,
                 entry_num_students.text())
@@ -329,6 +342,9 @@ class PDFReport(FPDF):
 
     @staticmethod
     def save_pdf():
+        logger = logging.getLogger('report')
+        logger.info("Starting PDF report generation")
+        
         details = PDFReport.prompt_report_details()
         if details is None:
             return False
@@ -340,31 +356,50 @@ class PDFReport(FPDF):
             if app_state.database:
                 app_state.database.insert_report_details(proctor, block, date, subject, room, start, end, num_students)
             else:
+                logger.error("Database connection not initialized")
                 raise ValueError("Database connection not initialized")
         except ValueError as e:
-            QMessageBox.critical(PDFReport.dialog, "Error", str(e))
+            error_msg = str(e)
+            logger.error(f"Database error: {error_msg}")
+            QMessageBox.critical(PDFReport.dialog, "Error", error_msg)
             return False
 
-        desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-        report_dir = os.path.join(desktop_path, REPORT_DIR_NAME)
-        pdf_filename = os.path.join(report_dir, f"{block}_{subject}_{date}.pdf")
+        try:
+            logger.info("Setting up report directory")
+            desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+            report_dir = os.path.join(desktop_path, REPORT_DIR_NAME)
+            if not os.path.exists(report_dir):
+                os.makedirs(report_dir)
+                logger.info(f"Created report directory: {report_dir}")
+            pdf_filename = os.path.join(report_dir, f"{block}_{subject}_{date}.pdf")
+            logger.info(f"PDF will be saved as: {pdf_filename}")
 
-        pdf = PDFReport()
-        pdf.set_auto_page_break(auto=True, margin=10)
-        pdf.add_page()
-        pdf.body(proctor, block, date, subject, room, start, end, num_students)
+            logger.info("Creating PDF document")
+            pdf = PDFReport()
+            pdf.set_auto_page_break(auto=True, margin=10)
+            pdf.add_page()
+            pdf.body(proctor, block, date, subject, room, start, end, num_students)
 
-        image_count = 0
-        x_positions = [10, 110]
-        y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
+            logger.info("Processing captured images")
+            image_count = 0
+            x_positions = [10, 110]
+            y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
 
-        for filename in os.listdir("tempcaptures"):
-            if filename.endswith(".jpg"):
+            if not os.path.exists("tempcaptures"):
+                logger.error("tempcaptures directory does not exist")
+                raise FileNotFoundError("tempcaptures directory not found")
+
+            captures = [f for f in os.listdir("tempcaptures") if f.endswith(".jpg")]
+            logger.info(f"Found {len(captures)} images to process")
+
+            for filename in captures:
                 if image_count > 0 and image_count % 4 == 0:
+                    logger.debug(f"Adding new page after {image_count} images")
                     pdf.add_page()
                     y_positions = [pdf.get_y() + 10, pdf.get_y() + 110]
 
                 image_path = os.path.join("tempcaptures", filename)
+                logger.debug(f"Processing image: {image_path}")
                 x = x_positions[image_count % 2]
                 y = y_positions[(image_count // 2) % 2]
                 pdf.image(image_path, x=x, y=y, w=90, h=90)
@@ -374,14 +409,19 @@ class PDFReport(FPDF):
                 pdf.cell(90, 5, filename_without_extension, 0, 0, 'C')
                 image_count += 1
 
-        try:
+            logger.info("Writing PDF file")
             pdf.output(pdf_filename)
+            logger.info(f"PDF saved successfully to: {pdf_filename}")
             QMessageBox.information(PDFReport.dialog, "PDF Saved", f"PDF saved as {pdf_filename}")
+            
+            logger.info("Running cleanup")
             GUIManager.cleanup()
             PDFReport.is_completed = True
             PDFReport.dialog.close()
             PDFReport.dialog = None
             return True
+            
         except Exception as e:
-            QMessageBox.critical(PDFReport.dialog, "Error", f"Failed to save PDF: {str(e)}")
+            logger.error(f"Failed to save PDF: {str(e)}\n{traceback.format_exc()}")
+            QMessageBox.critical(PDFReport.dialog, "Error", "Failed to save PDF report")
             return False

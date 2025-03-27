@@ -46,11 +46,28 @@ class CameraDisplayDock(QDockWidget):
         display_layout = QVBoxLayout()
         
         self.display_label = QLabel()
-        self.display_label.setFixedSize(640, 480)
         self.display_label.setStyleSheet("background-color: black; border: 2px solid #444444;")
+        self.display_label.setMinimumSize(320, 240)  # Minimum size to prevent too small display
         display_layout.addWidget(self.display_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         return display_layout
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Calculate 90% of the dock's width
+        dock_width = self.width()
+        dock_height = self.height() - self.camera_button.height() - 40  # Account for controls and margins
+        
+        # Set display size based on available width while maintaining 4:3 aspect ratio
+        target_width = int(dock_width * 0.9)
+        target_height = int((target_width * 3) / 4)  # 4:3 aspect ratio
+        
+        # If target height is too tall, base dimensions on height instead
+        if target_height > dock_height * 0.9:
+            target_height = int(dock_height * 0.9)
+            target_width = int((target_height * 4) / 3)
+        
+        self.display_label.setFixedSize(target_width, target_height)
 
     def get_main_window(self):
         parent = self.parent()

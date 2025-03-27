@@ -1,15 +1,14 @@
 import sys
-import os
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
 from frontend.components.main_window import MainWindow
 from frontend.components.splash_screen import SplashScreen
+from backend.utils.log_config import setup_logging
 
 def ensure_directories():
     directories = [
-        "tempcaptures",
-        Path(os.path.expanduser("~")) / ".proctorai" / "logs"
+        "tempcaptures"
     ]
     
     for directory in directories:
@@ -28,6 +27,7 @@ def start_main_window(splash, app):
     splash.close()
 
 def main():
+    setup_logging()
     ensure_directories()
     
     app = QApplication(sys.argv)
