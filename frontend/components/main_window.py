@@ -18,7 +18,7 @@ from backend.services.application_state import ApplicationState
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ProctorAI")
+        self.setWindowTitle("ProctorAI Release v1.3.7r")
         
         # Calculate 90% of screen size for window dimensions
         screen = self.screen().availableGeometry()
