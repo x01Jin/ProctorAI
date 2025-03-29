@@ -1,6 +1,9 @@
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from pygrabber.dshow_graph import FilterGraph
 import cv2
+import logging
+
+logger = logging.getLogger('camera')
 
 class CameraThread(QThread):
     def __init__(self, manager):
@@ -34,9 +37,36 @@ class CameraManager(QObject):
 
         self.main_window.camera_display.camera_combo.currentIndexChanged.connect(self.on_camera_selected)
 
+    def _get_opencv_devices(self):
+        # Fallback method using OpenCV
+        devices = []
+        for i in range(5):  # Check first 5 indices
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                devices.append(f"Camera {i}")
+                cap.release()
+                logger.info(f"Found camera at index {i}")
+        return devices
+
     def list_cameras(self):
-        graph = FilterGraph()
-        devices = graph.get_input_devices()
+        try:
+            logger.info("Attempting to list cameras using FilterGraph")
+            graph = FilterGraph()
+            devices = graph.get_input_devices()
+            if not devices:
+                logger.warning("No devices found using FilterGraph, falling back to OpenCV")
+                devices = self._get_opencv_devices()
+        except Exception as e:
+            logger.error(f"Failed to initialize FilterGraph: {str(e)}")
+            logger.info("Attempting fallback to OpenCV camera detection")
+            devices = self._get_opencv_devices()
+        
+        if not devices:
+            devices = ['No cameras found']
+            logger.error("No cameras detected on the system")
+        else:
+            logger.info(f"Found {len(devices)} camera(s): {devices}")
+        
         self.main_window.camera_display.populate_camera_list(devices)
         return devices
 
@@ -53,13 +83,26 @@ class CameraManager(QObject):
             self.stop_camera()
 
     def use_camera(self):
-        camera_index = self.camera_devices.index(self.selected_camera)
-        self.cap = cv2.VideoCapture(camera_index)
-        if self.cap.isOpened():
-            self.camera_thread = CameraThread(self)
-            self.camera_thread.start()
-        else:
-            print("Selected camera is not available.")
+        try:
+            if self.selected_camera == 'No cameras found':
+                logger.error("Cannot start camera - no cameras available")
+                return
+
+            if self.selected_camera.startswith('Camera '):
+                camera_index = int(self.selected_camera.split(' ')[1])
+            else:
+                camera_index = self.camera_devices.index(self.selected_camera)
+
+            logger.info(f"Attempting to open camera: {self.selected_camera} (index: {camera_index})")
+            self.cap = cv2.VideoCapture(camera_index)
+            if self.cap.isOpened():
+                self.camera_thread = CameraThread(self)
+                self.camera_thread.start()
+                logger.info(f"Successfully started camera {self.selected_camera}")
+            else:
+                logger.error(f"Failed to open camera {self.selected_camera}")
+        except Exception as e:
+            logger.error(f"Error initializing camera: {str(e)}")
 
     def _release_resources(self):
         self.camera_active = False
@@ -80,4 +123,5 @@ class CameraManager(QObject):
         self._release_resources()
 
     def cleanup(self):
+        logger.info("Cleaning up camera resources")
         self._release_resources()
