@@ -12,14 +12,26 @@ class CameraThread(QThread):
         self._is_running = True
 
     def run(self):
+        logger.info("Starting camera capture thread")
+        error_count = 0
+        
         while self._is_running and self.manager.cap and self.manager.cap.isOpened():
             ret, frame = self.manager.cap.read()
             if ret:
                 self.manager.current_image = frame
                 self.manager.frame_ready.emit(frame)
+                error_count = 0  # Reset error count on successful frame
+            else:
+                error_count += 1
+                if error_count >= 5:  # Stop after 5 consecutive errors
+                    logger.error("Too many consecutive frame read errors, stopping camera")
+                    break
             self.msleep(16)
+        
+        logger.info("Camera capture thread stopped")
 
     def stop(self):
+        logger.info("Stopping camera capture thread")
         self._is_running = False
 
 class CameraManager(QObject):
@@ -50,7 +62,7 @@ class CameraManager(QObject):
 
     def list_cameras(self):
         try:
-            logger.info("Attempting to list cameras using FilterGraph")
+            logger.debug("Attempting to list cameras using FilterGraph")
             graph = FilterGraph()
             devices = graph.get_input_devices()
             if not devices:
@@ -93,22 +105,32 @@ class CameraManager(QObject):
             else:
                 camera_index = self.camera_devices.index(self.selected_camera)
 
-            logger.info(f"Attempting to open camera: {self.selected_camera} (index: {camera_index})")
+            logger.info(f"Initializing camera: {self.selected_camera} (index: {camera_index})")
             self.cap = cv2.VideoCapture(camera_index)
+            
             if self.cap.isOpened():
+                # Log camera properties
+                width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+                height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                fps = self.cap.get(cv2.CAP_PROP_FPS)
+                logger.info(f"Camera initialized - Resolution: {width}x{height}, FPS: {fps}")
+                
                 self.camera_thread = CameraThread(self)
                 self.camera_thread.start()
-                logger.info(f"Successfully started camera {self.selected_camera}")
+                logger.info("Camera thread started successfully")
             else:
-                logger.error(f"Failed to open camera {self.selected_camera}")
+                logger.error(f"Failed to initialize camera {self.selected_camera} - Device not responding")
         except Exception as e:
             logger.error(f"Error initializing camera: {str(e)}")
 
     def _release_resources(self):
+        logger.info("Releasing camera resources")
         self.camera_active = False
+        
         if self.camera_thread and self.camera_thread.isRunning():
             self.camera_thread.stop()
             self.camera_thread.wait()
+            
         if self.cap and self.cap.isOpened():
             self.cap.release()
             self.cap = None

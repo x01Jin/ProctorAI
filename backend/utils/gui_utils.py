@@ -10,6 +10,9 @@ import random
 from backend.services.application_state import ApplicationState
 from frontend.components.image_label import ImageLabel
 
+# Create specific loggers
+camera_logger = logging.getLogger('camera')
+
 class GUIManager:
     logger = logging.getLogger('report')
 
@@ -68,14 +71,29 @@ class GUIManager:
     @staticmethod
     def display_frame(frame, display_label, window):
         try:
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            selected_filter = window.detection_controls.filter_combo.currentText()
-            for detection in window.detection_manager.detections:
-                if selected_filter == "All" or detection['class'] == selected_filter:
-                    GUIManager.draw_bounding_box(image_rgb, detection, window)
-            GUIManager.update_canvas(image_rgb, display_label)
+            if frame is None:
+                camera_logger.error("Received null frame for display")
+                return
+                
+            try:
+                image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            except cv2.error as e:
+                camera_logger.error(f"Color conversion failed: {e}")
+                return
+                
+            try:
+                selected_filter = window.detection_controls.filter_combo.currentText()
+                for detection in window.detection_manager.detections:
+                    if selected_filter == "All" or detection['class'] == selected_filter:
+                        GUIManager.draw_bounding_box(image_rgb, detection, window)
+                        
+                GUIManager.update_canvas(image_rgb, display_label)
+            except Exception as e:
+                camera_logger.error(f"Error processing detections: {e}")
+                GUIManager.update_canvas(image_rgb, display_label)
+                
         except Exception as e:
-            GUIManager.logger.error(f"Error displaying frame: {e}")
+            camera_logger.error(f"Critical error in frame display: {e}")
 
     @staticmethod
     def draw_bounding_box(image, detection, window):
@@ -127,11 +145,18 @@ class GUIManager:
     @staticmethod
     def update_canvas(image_rgb, display_label):
         try:
-            height, width = image_rgb.shape[:2]
-            bytes_per_line = 3 * width
-            q_image = QImage(image_rgb.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
-            pixmap = QPixmap.fromImage(q_image)
+            if image_rgb is None or image_rgb.size == 0:
+                camera_logger.error("Invalid image data for canvas update")
+                return
+                
+            bytes_per_line = 3 * image_rgb.shape[1]
+            q_image = QImage(image_rgb.data, image_rgb.shape[1], image_rgb.shape[0], bytes_per_line, QImage.Format.Format_RGB888)
             
+            if q_image.isNull():
+                camera_logger.error("Failed to create QImage from frame data")
+                return
+                
+            pixmap = QPixmap.fromImage(q_image)
             label_width = display_label.width()
             label_height = display_label.height()
             
@@ -153,8 +178,9 @@ class GUIManager:
             painter.end()
             
             display_label.setPixmap(bg_pixmap)
+            
         except Exception as e:
-            GUIManager.logger.error(f"Error updating canvas: {e}")
+            camera_logger.error(f"Error updating canvas: {e}")
 
     @staticmethod
     def add_image_label_to_layout(image_path, captures_layout, fixed_size=150):

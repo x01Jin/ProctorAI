@@ -34,7 +34,7 @@ def setup_logging():
             component_logger = logging.getLogger(component)
             if component == 'database':
                 component_logger.setLevel(logging.INFO)
-            elif component in ['roboflow', 'detection']:
+            elif component in ['roboflow', 'detection', 'camera']:
                 component_logger.setLevel(logging.DEBUG)
             else:
                 component_logger.setLevel(logging.ERROR)

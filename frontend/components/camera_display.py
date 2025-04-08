@@ -5,10 +5,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QImage
 import cv2
+import logging
 from backend.utils.gui_utils import GUIManager
+
+logger = logging.getLogger('camera')
 
 class CameraDisplayDock(QDockWidget):
     camera_toggle_requested = pyqtSignal()
+    last_size = None  # Track last logged size
 
     def __init__(self, title, parent=None):
         super().__init__(title, parent)
@@ -67,6 +71,12 @@ class CameraDisplayDock(QDockWidget):
             target_height = int(dock_height * 0.9)
             target_width = int((target_height * 4) / 3)
         
+        # Only log if size has changed
+        new_size = (target_width, target_height)
+        if new_size != self.last_size:
+            self.last_size = new_size
+            logger.debug(f"Display resized to {target_width}x{target_height}")
+            
         self.display_label.setFixedSize(target_width, target_height)
 
     def get_main_window(self):
@@ -78,21 +88,31 @@ class CameraDisplayDock(QDockWidget):
         return None
         
     def update_display(self, frame, clear_markers=False):
-        main_window = self.parent().window()
-        if clear_markers:
-            height, width = frame.shape[:2]
-            bytes_per_line = 3 * width
-            q_image = QImage(frame.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
-            self.display_label.setPixmap(QPixmap.fromImage(q_image))
-        else:
-            GUIManager.display_frame(frame, self.display_label, main_window)
+        try:
+            main_window = self.parent().window()
+            if clear_markers:
+                height, width = frame.shape[:2]
+                bytes_per_line = 3 * width
+                q_image = QImage(frame.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
+                self.display_label.setPixmap(QPixmap.fromImage(q_image))
+            else:
+                GUIManager.display_frame(frame, self.display_label, main_window)
+        except Exception as e:
+            logger.error(f"Error updating display: {str(e)}")
 
     def reset_display(self):
-        if hasattr(self.parent().window(), 'camera_manager'):
-            current_frame = self.parent().window().camera_manager.current_image
-            if current_frame is not None:
-                frame_rgb = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)
-                self.update_display(frame_rgb, clear_markers=True)
+        try:
+            if hasattr(self.parent().window(), 'camera_manager'):
+                current_frame = self.parent().window().camera_manager.current_image
+                if current_frame is not None:
+                    frame_rgb = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)
+                    self.update_display(frame_rgb, clear_markers=True)
+                else:
+                    logger.warning("No current frame available for display reset")
+            else:
+                logger.warning("Camera manager not available for display reset")
+        except Exception as e:
+            logger.error(f"Error resetting display: {str(e)}")
 
     def update_camera_button_text(self, is_running):
         self.camera_button.setText("Stop Camera" if is_running else "Start Camera")
@@ -101,5 +121,9 @@ class CameraDisplayDock(QDockWidget):
         return self.camera_combo.currentText()
 
     def populate_camera_list(self, cameras):
-        self.camera_combo.clear()
-        self.camera_combo.addItems(cameras)
+        try:
+            self.camera_combo.clear()
+            self.camera_combo.addItems(cameras)
+            logger.info(f"Camera list updated with devices: {cameras}")
+        except Exception as e:
+            logger.error(f"Error populating camera list: {str(e)}")
