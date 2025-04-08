@@ -5,22 +5,13 @@ import cv2
 import os
 import logging
 import requests
+import string
+import random
 from backend.services.application_state import ApplicationState
 from frontend.components.image_label import ImageLabel
 
 class GUIManager:
     logger = logging.getLogger('report')
-
-    @staticmethod
-    def update_status(internet_status_label, database_status_label):
-        internet_status = GUIManager.check_internet_status()
-        database_status = GUIManager.check_database_status()
-        
-        app_state = ApplicationState.get_instance()
-        app_state.update_connection_status(internet=internet_status, database=database_status)
-        
-        internet_status_label.setText(f"Internet: {'Connected' if internet_status else 'Disconnected'}")
-        database_status_label.setText(f"Database: {'Connected' if database_status else 'Disconnected'}")
 
     @staticmethod
     def check_internet_status():
@@ -65,11 +56,8 @@ class GUIManager:
                 GUIManager.logger.error(f"Invalid crop: x0={x0}, y0={y0}, x1={x1}, y1={y1}, image_shape={current_image.shape}")
                 return
 
-            existing_files = os.listdir("tempcaptures")
-            image_number = 1
-            while f"untagged({image_number}).jpg" in existing_files:
-                image_number += 1
-            image_filename = f"tempcaptures/untagged({image_number}).jpg"
+            random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
+            image_filename = f"tempcaptures/untagged({random_id}).jpg"
 
             cv2.imwrite(image_filename, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
             GUIManager.logger.info(f"Captured image saved to: {image_filename}")
@@ -105,16 +93,16 @@ class GUIManager:
             confidence = detection['confidence']
             
             CLASS_COLORS = {
-                0: (0, 165, 255),   # Orange
-                1: (255, 0, 128),   # Purple
-                2: (255, 255, 0),   # Cyan
-                3: (0, 255, 255),   # Yellow
-                4: (203, 192, 255), # Pink
-                5: (42, 42, 165),   # Brown
-                6: (250, 230, 230), # Lavender
-                7: (208, 224, 64),  # Turquoise
-                8: (214, 112, 218), # Orchid
-                9: (180, 130, 70),  # Steel Blue
+                0: (0, 165, 255),
+                1: (255, 0, 128),
+                2: (255, 255, 0),
+                3: (0, 255, 255),
+                4: (203, 192, 255),
+                5: (42, 42, 165),
+                6: (250, 230, 230),
+                7: (208, 224, 64),
+                8: (214, 112, 218),
+                9: (180, 130, 70),
             }
             
             color_index = hash(class_name) % 10
@@ -144,7 +132,6 @@ class GUIManager:
             q_image = QImage(image_rgb.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
             pixmap = QPixmap.fromImage(q_image)
             
-            # Calculate scaled size maintaining aspect ratio
             label_width = display_label.width()
             label_height = display_label.height()
             
@@ -155,15 +142,12 @@ class GUIManager:
                 Qt.TransformationMode.SmoothTransformation
             )
             
-            # Center the scaled pixmap in the label
             x = (label_width - scaled_pixmap.width()) // 2
             y = (label_height - scaled_pixmap.height()) // 2
             
-            # Create a black background pixmap
             bg_pixmap = QPixmap(label_width, label_height)
             bg_pixmap.fill(Qt.GlobalColor.black)
             
-            # Paint the scaled image onto the background
             painter = QPainter(bg_pixmap)
             painter.drawPixmap(x, y, scaled_pixmap)
             painter.end()
@@ -243,11 +227,22 @@ class GUIManager:
     def remove_image_from_layout(image_path, captures_layout):
         try:
             for i in range(captures_layout.count()):
-                container = captures_layout.itemAt(i).widget()
-                if container and hasattr(container, 'image_path') and container.image_path == image_path:
+                item = captures_layout.itemAt(i)
+                if not item:
+                    continue
+                    
+                container = item.widget()
+                if not container:
+                    captures_layout.takeAt(i)
+                    continue
+                    
+                if hasattr(container, 'image_path') and container.image_path == image_path:
                     container.deleteLater()
                     captures_layout.takeAt(i)
                     GUIManager.logger.info(f"Removed image container from layout: {image_path}")
+                    
+                    if captures_layout.parentWidget():
+                        captures_layout.parentWidget().update()
                     break
         except Exception as e:
             GUIManager.logger.error(f"Error removing image from layout: {e}")

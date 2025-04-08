@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QSplitter, QMessageBox, QDockWidget
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 import sys
 import logging
 from backend.controllers.camera_controller import CameraManager
@@ -40,7 +40,6 @@ class MainWindow(QMainWindow):
         self.setup_components()
         self.setup_model()
         self.connect_signals()
-        self.setup_connection_monitor()
         
     def setup_window(self):
         try:
@@ -161,30 +160,6 @@ class MainWindow(QMainWindow):
         else:
             event.ignore()
 
-    def setup_connection_monitor(self):
-        self.connection_timer = QTimer(self)
-        self.connection_timer.timeout.connect(self.check_connections)
-        # Check connections every 30 seconds
-        self.connection_timer.start(30000)
-        
-    def check_connections(self):
-        if not self.app_state.database:
-            return
-            
-        # Check connections and update status bar
-        internet_status = GUIManager.check_internet_status()
-        database_status = GUIManager.check_database_status()
-        
-        self.app_state.update_connection_status(
-            internet=internet_status,
-            database=database_status
-        )
-        
-        self.status_bar.update_connection_status(
-            internet=internet_status,
-            database=database_status
-        )
-
     def on_settings_updated(self):
         try:
             # Stop detection if running
@@ -215,8 +190,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'camera_manager'):
             self.camera_manager.cleanup()
         self.report_manager.cleanup()
-        if hasattr(self, 'connection_timer'):
-            self.connection_timer.stop()
         
     def get_selected_capture_class(self):
         return self.detection_controls.get_selected_capture_class()

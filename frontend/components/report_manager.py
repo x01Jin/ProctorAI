@@ -15,6 +15,8 @@ class ReportManagerDock(QDockWidget):
         self.logger = logging.getLogger('report')
         self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         self.temp_dir = "tempcaptures"
+        self.being_deleted = set()  # Track files being deleted
+        self.displayed_files = set()  # Track currently displayed files
         self.setup_ui()
         self.setup_file_watcher()
 
@@ -74,38 +76,47 @@ class ReportManagerDock(QDockWidget):
         try:
             self.logger.info(f"Handling directory change in {path}")
             
+            # Get current files from filesystem
             current_files = set()
             if os.path.exists(self.temp_dir):
                 current_files = {os.path.join(self.temp_dir, f) for f in os.listdir(self.temp_dir) if f.endswith('.jpg')}
 
-            displayed_files = set()
+            # Update displayed files set
+            self.displayed_files.clear()
             for i in range(self.image_layout.count()):
                 try:
                     widget = self.image_layout.itemAt(i).widget()
                     if widget and not widget.isHidden() and hasattr(widget, 'image_path'):
-                        displayed_files.add(widget.image_path)
+                        self.displayed_files.add(widget.image_path)
                 except (RuntimeError, AttributeError) as e:
                     self.logger.error(f"Error accessing widget: {e}")
                     continue
 
-            new_files = current_files - displayed_files
-            removed_files = displayed_files - current_files
-
+            # Handle new files
+            new_files = current_files - self.displayed_files - self.being_deleted
             if new_files:
                 self.logger.info(f"Adding new files: {new_files}")
                 for file_path in new_files:
                     try:
-                        GUIManager.add_image_label_to_layout(file_path, self.image_layout)
+                        if os.path.exists(file_path):  # Double check file still exists
+                            GUIManager.add_image_label_to_layout(file_path, self.image_layout)
+                            self.displayed_files.add(file_path)
                     except Exception as e:
                         self.logger.error(f"Failed to add image {file_path}: {e}")
 
+            # Handle removed files (excluding those being deleted)
+            removed_files = self.displayed_files - current_files - self.being_deleted
             if removed_files:
                 self.logger.info(f"Removing files: {removed_files}")
                 for file_path in removed_files:
                     try:
                         GUIManager.remove_image_from_layout(file_path, self.image_layout)
+                        self.displayed_files.discard(file_path)
                     except Exception as e:
                         self.logger.error(f"Failed to remove image {file_path}: {e}")
+
+            # Clean up any stale deletion tracking
+            self.being_deleted = {f for f in self.being_deleted if os.path.exists(f)}
 
             if new_files or removed_files:
                 self.image_container.update()

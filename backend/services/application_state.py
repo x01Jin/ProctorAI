@@ -11,7 +11,6 @@ class ApplicationState:
         
         self._db_instance: Optional[DatabaseManager] = None
         self._rf_instance: Optional[RoboflowManager] = None
-        self.internet_connected = False
         self.db_connected = False
         self.rf_connected = False
     
@@ -36,7 +35,7 @@ class ApplicationState:
     def initialize_roboflow(self) -> bool:
         if self._rf_instance is None:
             self._rf_instance = RoboflowManager.get_instance()
-        return self._rf_instance.initialize()
+        return True
 
     def reinitialize_roboflow(self) -> bool:
         """Reinitialize Roboflow with new settings."""
@@ -47,9 +46,8 @@ class ApplicationState:
             return True
         return False
     
-    def update_connection_status(self, internet=None, database=None, roboflow=None):
-        if internet is not None:
-            self.internet_connected = internet
+    def update_connection_status(self, database=None, roboflow=None):
+        """Update connection status during initialization"""
         if database is not None:
             self.db_connected = database
         if roboflow is not None:

@@ -23,12 +23,29 @@ class ImageLabel(QLabel):
 
     def delete_image(self):
         try:
+            # Get the report manager instance
+            parent = self.parent()
+            while parent and not hasattr(parent, 'being_deleted'):
+                parent = parent.parent()
+            
+            if parent:
+                # Mark file as being deleted
+                parent.being_deleted.add(self.image_path)
+            
+            # Remove UI first for responsiveness
+            self.deleteLater()
+            
+            # Then delete file
             if os.path.exists(self.image_path):
                 os.remove(self.image_path)
-            self.deleteLater()
+                
+            if parent:
+                # Remove from tracking set after deletion
+                parent.being_deleted.discard(self.image_path)
         except Exception as e:
             print(f"Error deleting image {self.image_path}: {e}")
-            self.deleteLater()
+            if parent:
+                parent.being_deleted.discard(self.image_path)
 
     def add_tag(self):
         tag, ok = QInputDialog.getText(self, "Add Tag", "Enter tag:")

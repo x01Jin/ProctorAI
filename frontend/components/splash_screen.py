@@ -2,7 +2,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QApplicatio
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor, QPalette
 import time
-import urllib.request
 from backend.services.application_state import ApplicationState
 from config.settings_manager import SettingsManager
 from config.settings_dialog import SettingsDialog
@@ -106,13 +105,13 @@ class SplashScreen(QWidget):
         format = QTextCharFormat()
         
         if level == "success":
-            format.setForeground(QBrush(QColor(76, 175, 80)))  # RGB for #4CAF50
+            format.setForeground(QBrush(QColor(76, 175, 80)))
             prefix = "✓"
         elif level == "warning":
-            format.setForeground(QBrush(QColor(255, 193, 7)))  # RGB for #FFC107
+            format.setForeground(QBrush(QColor(255, 193, 7)))
             prefix = "⚠️"
         elif level == "error":
-            format.setForeground(QBrush(QColor(244, 67, 54)))  # RGB for #F44336
+            format.setForeground(QBrush(QColor(244, 67, 54)))
             prefix = "❌"
         else:
             format.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
@@ -136,7 +135,6 @@ class SplashScreen(QWidget):
             settings.create_default_config()
             self.log_message("Configuration file created... launching setup...", "info")
             
-            # Show settings dialog
             settings_dialog = SettingsDialog(settings, parent=self, setup_mode=True)
             if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
                 self.log_message("Setup cancelled... proceeding anyway...", "warning")
@@ -146,24 +144,22 @@ class SplashScreen(QWidget):
         return True
 
     def check_internet(self, retry_count=3):
-        app_state = ApplicationState.get_instance()
         self.log_message("Checking internet connection...")
-        QApplication.processEvents()
-        time.sleep(1)
+        import subprocess
+        import platform
+        
         for attempt in range(retry_count):
             try:
-                urllib.request.urlopen("http://google.com", timeout=1)
+                command = ["ping", "-n" if platform.system().lower()=="windows" else "-c", "1", "8.8.8.8"]
+                subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
                 self.log_message("Internet connection established", "success")
-                app_state.update_connection_status(internet=True)
                 return True
-            except Exception as e:
+            except subprocess.CalledProcessError:
                 if attempt < retry_count - 1:
-                    self.log_message(f"Internet connection failed ({str(e)}), retrying... ({attempt + 1}/{retry_count})", "warning")
+                    self.log_message(f"Internet connection failed, retrying... ({attempt + 1}/{retry_count})", "warning")
                 else:
-                    self.log_message(f"Internet connection failed after 3 attempts: {str(e)}", "error")
-                    self.log_message("Internet connection failed... proceeding anyway...", "warning")
+                    self.log_message("Internet connection failed after 3 attempts", "error")
                     self.log_message("Some features may be limited without internet connection", "warning")
-                    app_state.update_connection_status(internet=False)
                     return False
 
     def check_roboflow(self, retry_count=3):
@@ -194,7 +190,6 @@ class SplashScreen(QWidget):
                         QTimer.singleShot(1000, lambda: QApplication.instance().quit())
                         return False
                     
-                    # Try to connect again after settings update
                     return self.check_roboflow(retry_count)
 
     def check_database(self, retry_count=3):
@@ -225,10 +220,12 @@ class SplashScreen(QWidget):
                         QTimer.singleShot(1000, lambda: QApplication.instance().quit())
                         return False
                     
-                    # Try to connect again after settings update
                     return self.check_database(retry_count)
 
     def perform_checks(self, on_complete=None):
+        # Initialize application state at the start
+        ApplicationState.get_instance()
+        
         config_ok = self.check_config()
         QTimer.singleShot(100, lambda: self._check_internet(config_ok, on_complete))
 
