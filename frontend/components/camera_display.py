@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (
     QDockWidget, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QComboBox, QPushButton
+    QLabel, QComboBox
 )
+from .buttons import AnimatedStateButton
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QImage
 import cv2
@@ -40,7 +41,7 @@ class CameraDisplayDock(QDockWidget):
         controls_layout.addWidget(QLabel("Select Camera:"))
         controls_layout.addWidget(self.camera_combo)
 
-        self.camera_button = QPushButton("Start Camera")
+        self.camera_button = AnimatedStateButton("Start Camera")
         self.camera_button.clicked.connect(self.camera_toggle_requested.emit)
         controls_layout.addWidget(self.camera_button)
 
@@ -116,6 +117,7 @@ class CameraDisplayDock(QDockWidget):
 
     def update_camera_button_text(self, is_running):
         self.camera_button.setText("Stop Camera" if is_running else "Start Camera")
+        self.camera_button.set_active(is_running)
 
     def get_selected_camera(self):
         return self.camera_combo.currentText()

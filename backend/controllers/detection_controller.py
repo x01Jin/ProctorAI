@@ -2,7 +2,6 @@ from PyQt6.QtCore import QObject, pyqtSignal, QThread
 import cv2
 import requests
 import logging
-from backend.utils.gui_utils import GUIManager
 from time import time
 
 class DetectionThread(QThread):
@@ -92,13 +91,6 @@ class DetectionManager(QObject):
         try:
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             confidence_threshold = self.main_window.detection_controls.get_confidence_threshold()
-
-            if not GUIManager.check_internet_status():
-                self.logger.error("Connection error detected, retrying...")
-                self.connection_status_changed.emit(False)
-                QThread.sleep(3)
-                return self.process_image(image)
-
             try:
                 self.logger.debug("Sending prediction request to model")
                 result = self.model.predict(image_rgb, confidence=confidence_threshold, overlap=30).json()

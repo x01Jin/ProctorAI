@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QFormLayout, QComboBox, QLabel, QLineEdit,
     QSpinBox, QPushButton, QMessageBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import pyqtSignal
 from frontend.themes.theme_manager import ThemeManager
 
 class SettingsDialog(QDialog):
@@ -15,7 +15,6 @@ class SettingsDialog(QDialog):
         self.setup_type = setup_type
         self.setWindowTitle("Setup" if setup_mode else "Settings")
         self.setModal(True)
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         
         self.theme_manager = ThemeManager(self)
         current_theme = settings.get_setting("theme", "theme")

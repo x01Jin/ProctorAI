@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (
     QDockWidget, QWidget, QHBoxLayout, QLabel,
-    QComboBox, QPushButton, QSlider
+    QComboBox, QSlider
 )
+from .buttons import AnimatedStateButton
 from PyQt6.QtCore import Qt, pyqtSignal
 
 class DetectionControlsDock(QDockWidget):
@@ -54,7 +55,7 @@ class DetectionControlsDock(QDockWidget):
         self.display_mode_combo.currentTextChanged.connect(self.display_mode_changed.emit)
 
     def setup_detection_button(self, layout):
-        self.detection_button = QPushButton("Start Detection")
+        self.detection_button = AnimatedStateButton("Start Detection")
         self.detection_button.clicked.connect(self.detection_toggle_requested.emit)
         layout.addWidget(self.detection_button)
 
@@ -106,3 +107,4 @@ class DetectionControlsDock(QDockWidget):
 
     def update_detection_button_text(self, is_running):
         self.detection_button.setText("Stop Detection" if is_running else "Start Detection")
+        self.detection_button.set_active(is_running)

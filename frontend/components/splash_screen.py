@@ -10,7 +10,7 @@ from frontend.themes.theme_manager import ThemeManager
 class SplashScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setFixedSize(600, 400)
         
         self.settings = SettingsManager()

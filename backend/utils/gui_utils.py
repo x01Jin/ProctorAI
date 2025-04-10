@@ -4,32 +4,14 @@ from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel
 import cv2
 import os
 import logging
-import requests
 import string
 import random
-from backend.services.application_state import ApplicationState
 from frontend.components.image_label import ImageLabel
 
-# Create specific loggers
 camera_logger = logging.getLogger('camera')
 
 class GUIManager:
     logger = logging.getLogger('report')
-
-    @staticmethod
-    def check_internet_status():
-        try:
-            requests.get("http://google.com", timeout=1)
-            return True
-        except requests.exceptions.RequestException:
-            return False
-
-    @staticmethod
-    def check_database_status():
-        app_state = ApplicationState.get_instance()
-        if not app_state.database:
-            return False
-        return app_state.database.test_connection()
 
     @staticmethod
     def capture_image(detection, current_image, window):
