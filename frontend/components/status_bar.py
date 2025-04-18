@@ -2,12 +2,8 @@ from PyQt6.QtWidgets import QStatusBar, QLabel
 
 class StatusBarManager:
     def __init__(self, parent):
-        self.parent = parent
         self.status_bar = QStatusBar()
         parent.setStatusBar(self.status_bar)
-        self.setup_status_labels()
-
-    def setup_status_labels(self):
         self.detected_objects_label = QLabel("Detected Objects: 0")
         self.status_bar.addWidget(self.detected_objects_label)
 

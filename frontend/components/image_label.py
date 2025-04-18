@@ -1,89 +1,76 @@
 from PyQt6.QtWidgets import QLabel, QInputDialog, QMenu, QMessageBox
 from PyQt6.QtCore import Qt
-import os
+from pathlib import Path
 
 class ImageLabel(QLabel):
     def __init__(self, image_path, parent=None, filename_label=None):
         super().__init__(parent)
-        self.image_path = image_path
+        self.image_path = str(image_path)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.show_context_menu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
         self.tag = ""
         self.filename_label = filename_label
 
-    def show_context_menu(self, pos):
+    def _show_context_menu(self, pos):
         context_menu = QMenu(self)
-        delete_action = context_menu.addAction("Delete")
-        edit_tag_action = context_menu.addAction("Edit Tag")
+        actions = {
+            "Delete": self._delete_image,
+            "Edit Tag": self._add_tag
+        }
+        for name in actions:
+            context_menu.addAction(name)
         action = context_menu.exec(self.mapToGlobal(pos))
-        if action == delete_action:
-            self.delete_image()
-        elif action == edit_tag_action:
-            self.add_tag()
+        if action and action.text() in actions:
+            actions[action.text()]()
 
-    def delete_image(self):
-        try:
-            # Get the report manager instance
-            parent = self.parent()
-            while parent and not hasattr(parent, 'being_deleted'):
-                parent = parent.parent()
-            
-            if parent:
-                # Mark file as being deleted
-                parent.being_deleted.add(self.image_path)
-            
-            # Remove UI first for responsiveness
-            self.deleteLater()
-            
-            # Then delete file
-            if os.path.exists(self.image_path):
-                os.remove(self.image_path)
-                
-            if parent:
-                # Remove from tracking set after deletion
-                parent.being_deleted.discard(self.image_path)
-        except Exception as e:
-            print(f"Error deleting image {self.image_path}: {e}")
-            if parent:
-                parent.being_deleted.discard(self.image_path)
+    def _delete_image(self):
+        parent = self.parent()
+        while parent and not hasattr(parent, 'being_deleted'):
+            parent = parent.parent()
+        if parent:
+            parent.being_deleted.add(self.image_path)
+        self.deleteLater()
+        path = Path(self.image_path)
+        if path.exists():
+            path.unlink()
+        if parent:
+            parent.being_deleted.discard(self.image_path)
 
-    def add_tag(self):
+    def _add_tag(self):
         tag, ok = QInputDialog.getText(self, "Add Tag", "Enter tag:")
-        if ok and tag:
-            if self.is_valid_tag(tag):
-                self.tag = tag
-                self.setToolTip(tag)
-                self.update()
-                self.update_filename_with_tag()
-            else:
-                QMessageBox.critical(self, "Invalid Tag", "The tag contains invalid characters.")
-    
-    def redo_tag(self):
-        self.add_tag()
+        if ok and tag and self._is_valid_tag(tag):
+            self.tag = tag
+            self.setToolTip(tag)
+            self.update()
+            self._update_filename_with_tag()
+        elif ok and tag:
+            QMessageBox.critical(self, "Invalid Tag", "The tag contains invalid characters.")
 
-    def is_valid_tag(self, tag):
+    def redo_tag(self):
+        self._add_tag()
+
+    def _is_valid_tag(self, tag):
         invalid_chars = r'<>:"/\|?*'
         return not any(char in invalid_chars for char in tag)
 
-    def update_filename_with_tag(self):
-        directory, original_filename = os.path.split(self.image_path)
-        _, ext = os.path.splitext(original_filename)
+    def _update_filename_with_tag(self):
+        path = Path(self.image_path)
+        directory = path.parent
+        ext = path.suffix
         new_filename = f"{self.tag}{ext}"
-        new_filepath = os.path.join(directory, new_filename)
-
+        new_filepath = directory / new_filename
         counter = 1
-        while os.path.exists(new_filepath):
+        while new_filepath.exists():
             new_filename = f"{self.tag}_{counter}{ext}"
-            new_filepath = os.path.join(directory, new_filename)
+            new_filepath = directory / new_filename
             counter += 1
-
-        os.rename(self.image_path, new_filepath)
-        self.image_path = new_filepath
+        path.rename(new_filepath)
+        self.image_path = str(new_filepath)
         if self.filename_label:
             self.filename_label.setText(self.tag)
-            self.update_filename_label_width()
+            self._update_filename_label_width()
 
-    def update_filename_label_width(self):
+    def _update_filename_label_width(self):
         if not self.filename_label:
             return
         metrics = self.filename_label.fontMetrics()

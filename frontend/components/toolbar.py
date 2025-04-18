@@ -7,7 +7,7 @@ from backend.services.application_state import ApplicationState
 
 class ToolbarManager(QObject):
     settings_updated = pyqtSignal()
-    
+
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
@@ -15,49 +15,36 @@ class ToolbarManager(QObject):
         self.settings = SettingsManager()
         self.settings_dialog = SettingsDialog(self.settings, parent)
         parent.addToolBar(self.toolbar)
-        self.setup_actions()
+        self._setup_actions()
 
-    def setup_actions(self):
-        toggle_camera_action = QAction("Toggle Camera & Display", self.parent)
-        toggle_camera_action.triggered.connect(self.toggle_camera_display)
-        self.toolbar.addAction(toggle_camera_action)
+    def _setup_actions(self):
+        actions = [
+            ("Toggle Camera & Display", self._toggle_camera_display),
+            ("Toggle Detection Controls", self._toggle_detection_controls),
+            ("Toggle Captured Images Dock", self._toggle_report_manager),
+            ("Settings", self._show_settings)
+        ]
+        for name, slot in actions:
+            action = QAction(name, self.parent)
+            action.triggered.connect(slot)
+            self.toolbar.addAction(action)
 
-        toggle_controls_action = QAction("Toggle Detection Controls", self.parent)
-        toggle_controls_action.triggered.connect(self.toggle_detection_controls)
-        self.toolbar.addAction(toggle_controls_action)
+    def _toggle_camera_display(self):
+        self.parent.camera_display.setVisible(not self.parent.camera_display.isVisible())
 
-        toggle_report_action = QAction("Toggle Captured Images Dock", self.parent)
-        toggle_report_action.triggered.connect(self.toggle_report_manager)
-        self.toolbar.addAction(toggle_report_action)
+    def _toggle_detection_controls(self):
+        self.parent.detection_controls.setVisible(not self.parent.detection_controls.isVisible())
 
-        settings_action = QAction("Settings", self.parent)
-        settings_action.triggered.connect(self.show_settings)
-        self.toolbar.addAction(settings_action)
+    def _toggle_report_manager(self):
+        self.parent.report_manager.setVisible(not self.parent.report_manager.isVisible())
 
-    def toggle_camera_display(self):
-        self.parent.camera_display.setVisible(
-            not self.parent.camera_display.isVisible()
-        )
-
-    def toggle_detection_controls(self):
-        self.parent.detection_controls.setVisible(
-            not self.parent.detection_controls.isVisible()
-        )
-
-    def toggle_report_manager(self):
-        self.parent.report_manager.setVisible(
-            not self.parent.report_manager.isVisible()
-        )
-
-    def show_settings(self):
+    def _show_settings(self):
         if self.settings_dialog.exec() == SettingsDialog.DialogCode.Accepted:
             theme = self.settings.get_setting("theme", "theme")
             self.parent.theme_manager.apply_theme(theme)
-            
             app_state = ApplicationState.get_instance()
             if app_state.database:
                 app_state.database.connection = None
                 app_state.database.connect()
                 app_state.update_connection_status(database=app_state.database.test_connection())
-            
             self.settings_updated.emit()
