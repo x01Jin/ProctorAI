@@ -28,16 +28,16 @@ class DetectionControlsDock(QDockWidget):
         layout.setSpacing(25)
 
         self.filter_combo = QComboBox()
-        add_pair(layout, "Filter By:", self.filter_combo, QSizePolicy.Policy.Expanding)
+        add_pair(layout, "Bounding box Filters :", self.filter_combo, QSizePolicy.Policy.Expanding)
         self.filter_combo.currentTextChanged.connect(lambda text: self.filter_changed.emit(text))
 
         self.capture_class_combo = QComboBox()
-        add_pair(layout, "Capture:", self.capture_class_combo, QSizePolicy.Policy.Expanding)
+        add_pair(layout, "Capture :", self.capture_class_combo, QSizePolicy.Policy.Expanding)
         self.capture_class_combo.currentTextChanged.connect(lambda text: self.capture_class_changed.emit(text))
 
         self.display_mode_combo = QComboBox()
-        self.display_mode_combo.addItems(["draw_labels", "draw_confidence"])
-        add_pair(layout, "Display Mode:", self.display_mode_combo, QSizePolicy.Policy.Expanding)
+        self.display_mode_combo.addItems(["Draw Labels", "Draw Confidence"])
+        add_pair(layout, "Draw Display Mode :", self.display_mode_combo, QSizePolicy.Policy.Expanding)
         self.display_mode_combo.currentTextChanged.connect(lambda text: self.display_mode_changed.emit(text))
 
         self.detection_button = AnimatedStateButton("Start Detection")
@@ -54,7 +54,7 @@ class DetectionControlsDock(QDockWidget):
         self.confidence_slider.valueChanged.connect(self._update_confidence_label)
 
         confidence_container = QHBoxLayout()
-        confidence_container.addWidget(QLabel("Confidence Threshold:"), 1)
+        confidence_container.addWidget(QLabel("Confidence Threshold :"), 1)
         confidence_container.addWidget(self.confidence_label, 1)
         confidence_container.addWidget(self.confidence_slider, 3)
         confidence_widget = QWidget()

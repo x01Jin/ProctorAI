@@ -15,7 +15,7 @@ from backend.services.application_state import ApplicationState
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ProctorAI Release v1.3.8r")
+        self.setWindowTitle("ProctorAI Release v1.3.9r")
         screen = self.screen().availableGeometry()
         width = int(screen.width() * 0.9)
         height = int(screen.height() * 0.9)
