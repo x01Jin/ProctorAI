@@ -29,19 +29,15 @@ class SettingsDialog(QDialog):
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # Theme settings
         theme_group = self._create_theme_group()
         layout.addWidget(theme_group)
         
-        # Roboflow settings
         robo_group = self._create_roboflow_group()
         layout.addWidget(robo_group)
         
-        # Database settings
         db_group = self._create_database_group()
         layout.addWidget(db_group)
         
-        # Buttons
         button_layout = self._create_button_layout()
         layout.addLayout(button_layout)
         
@@ -189,7 +185,6 @@ class SettingsDialog(QDialog):
             
             self.settings.save_settings()
             
-            # Show success message in setup mode
             if self.setup_mode:
                 QMessageBox.information(
                     self,

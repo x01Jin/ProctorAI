@@ -36,7 +36,6 @@ def main():
     splash = SplashScreen()
     splash.show()
     
-    # Start checks after a delay to show splash screen
     QTimer.singleShot(1000, lambda: splash.perform_checks(
         lambda c, i, r, d: handle_checks_complete(splash, app, c, i, r, d)
     ))

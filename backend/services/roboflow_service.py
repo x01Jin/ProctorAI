@@ -3,6 +3,15 @@ from config.settings_manager import SettingsManager
 import sys
 import logging
 
+def singleton(cls):
+    instances = {}
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+    cls.get_instance = staticmethod(get_instance)
+    return cls
+
 class SplashLogWriter:
     def __init__(self, splash_screen):
         self.splash_screen = splash_screen
@@ -10,72 +19,53 @@ class SplashLogWriter:
         self.logger = logging.getLogger('roboflow')
 
     def write(self, text):
-        if text.strip():  # Only log non-empty lines
+        if text.strip():
             self.splash_screen.log_message(text.strip())
-            self.logger.debug(text.strip())  # Log to roboflow.log
+            self.logger.debug(text.strip())
 
     def flush(self):
         if self.original_stdout:
             self.original_stdout.flush()
 
+@singleton
 class RoboflowManager:
-    _instance = None
     last_error = None
-    
-    @classmethod
-    def get_instance(cls):
-        if cls._instance is None:
-            cls._instance = RoboflowManager()
-        return cls._instance
-    
+
     def __init__(self):
-        if RoboflowManager._instance is not None:
-            raise Exception("RoboflowManager is a singleton!")
         self._model = None
         self._classes = []
         self.settings = SettingsManager()
         self.logger = logging.getLogger('roboflow')
         self.logger.setLevel(logging.INFO)
-    
+
     @property
     def model(self):
         return self._model
-        
+
     @property
     def classes(self):
         return self._classes
-    
+
     def initialize(self, splash_screen=None):
         settings = SettingsManager()
         original_stdout = sys.stdout
         try:
             if splash_screen:
                 sys.stdout = SplashLogWriter(splash_screen)
-            
             api_key = settings.get_setting("roboflow", "api_key")
             project_name = settings.get_setting("roboflow", "project")
             model_version = settings.get_setting("roboflow", "model_version")
-            
             self.logger.info(f"Connecting to Roboflow (Project: {project_name}, Version: {model_version})")
             rf = Roboflow(api_key=api_key)
-            
-            self.logger.info("Loading project...")
             project = rf.workspace().project(project_name)
-            
-            self.logger.info(f"Initializing model version {model_version}")
             self._model = project.version(model_version).model
-            
             model_classes = settings.get_setting("roboflow", "model_classes")
             if not model_classes:
                 raise ValueError("No model classes specified in settings")
-
-            # Split and clean classes, removing empty strings
             self._classes = [cls.strip() for cls in model_classes.split(",") if cls.strip()]
             if not self._classes:
                 raise ValueError("No valid classes found after parsing model_classes setting")
-                
             self.logger.info(f"Model initialized with classes: {', '.join(self._classes)}")
-            
             return True
         except Exception as e:
             error_msg = str(e)

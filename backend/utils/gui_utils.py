@@ -120,7 +120,6 @@ class GUIManager:
             text_size, baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
             text_x, text_y = x, y - text_size[1] - 4
             cv2.rectangle(image, (text_x, text_y), (text_x + text_size[0], text_y + text_size[1] + baseline), color, -1)
-            # Calculate negative color
             negative_color = tuple(255 - c for c in color)
             cv2.putText(image, text, (text_x, text_y + text_size[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, negative_color, 1)
         except Exception as e:

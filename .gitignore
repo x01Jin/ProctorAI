@@ -13,3 +13,4 @@ experiment.py
 __pycache__
 app_settings.json
 config.ini
+appfeaturesdoc.md

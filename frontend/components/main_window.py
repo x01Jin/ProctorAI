@@ -11,6 +11,7 @@ from .toolbar import ToolbarManager
 from frontend.themes.theme_manager import ThemeManager
 from backend.utils.gui_utils import GUIManager
 from backend.services.application_state import ApplicationState
+from backend.controllers.report_controller import save_pdf
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -83,8 +84,7 @@ class MainWindow(QMainWindow):
         self.detection_manager.toggle_detection()
 
     def _generate_pdf(self):
-        from backend.controllers.report_controller import PDFReport
-        PDFReport.save_pdf()
+        save_pdf()
 
     def _process_detections(self, detections):
         selected_class = self.get_selected_capture_class()
