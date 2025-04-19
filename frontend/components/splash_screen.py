@@ -1,10 +1,9 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QApplication
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor, QPalette
+from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor
 from backend.services.application_state import ApplicationState
 from config.settings_manager import SettingsManager
 from config.settings_dialog import SettingsDialog
-from frontend.themes.theme_manager import ThemeManager
 import time
 
 class SplashScreen(QWidget):
@@ -12,25 +11,22 @@ class SplashScreen(QWidget):
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setFixedSize(600, 400)
-        self.settings = SettingsManager()
-        self.theme_manager = ThemeManager(self)
-        theme = self.settings.get_setting("theme", "theme")
-        if theme:
-            self.theme_manager.apply_theme(theme)
         self.setProperty("class", "splash-screen")
         self.setStyleSheet("""
             QWidget[class="splash-screen"] {
-                border: 2px solid palette(dark);
+                background-color: #23272e;
+                border: 2px solid #444857;
                 border-radius: 10px;
             }
             QLabel {
                 background: transparent;
                 border: none;
+                color: #f5f6fa;
             }
             QTextEdit {
-                background-color: palette(base);
-                color: palette(text);
-                border: 1px solid palette(dark);
+                background-color: #181a20;
+                color: #f5f6fa;
+                border: 1px solid #444857;
                 border-radius: 5px;
                 padding: 5px;
             }
@@ -57,37 +53,37 @@ class SplashScreen(QWidget):
         title_font.setPointSize(24)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: palette(text);")
+        title_label.setStyleSheet("color: #f5f6fa;")
         layout.addWidget(title_label)
         subtitle_label = QLabel("Cheating Detection Assistant")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle_font = QFont()
         subtitle_font.setPointSize(14)
         subtitle_label.setFont(subtitle_font)
-        subtitle_label.setStyleSheet("color: palette(text);")
+        subtitle_label.setStyleSheet("color: #f5f6fa;")
         layout.addWidget(subtitle_label)
         thesis_label = QLabel("A Thesis Project")
         thesis_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         thesis_font = QFont()
         thesis_font.setPointSize(12)
         thesis_label.setFont(thesis_font)
-        thesis_label.setStyleSheet("color: palette(text);")
+        thesis_label.setStyleSheet("color: #f5f6fa;")
         layout.addWidget(thesis_label)
         creators_label = QLabel("Created by: CROISSANTS")
         creators_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         creators_font = QFont()
         creators_font.setPointSize(10)
         creators_label.setFont(creators_font)
-        creators_label.setStyleSheet("color: palette(text);")
+        creators_label.setStyleSheet("color: #f5f6fa;")
         layout.addWidget(creators_label)
         self.log_display = QTextEdit()
         self.log_display.setReadOnly(True)
         self.log_display.setFixedHeight(200)
         self.log_display.setStyleSheet("""
             QTextEdit {
-                background-color: palette(base);
-                color: palette(text);
-                border: 1px solid palette(dark);
+                background-color: #181a20;
+                color: #f5f6fa;
+                border: 1px solid #444857;
                 border-radius: 5px;
                 padding: 5px;
             }
@@ -108,7 +104,7 @@ class SplashScreen(QWidget):
             format.setForeground(QBrush(QColor(244, 67, 54)))
             prefix = "❌"
         else:
-            format.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
+            format.setForeground(QBrush(QColor(245, 246, 250)))
             prefix = "→"
         self.log_display.moveCursor(QTextCursor.MoveOperation.End)
         self.log_display.textCursor().insertText(f"[{timestamp}] {prefix} {message}\n", format)
