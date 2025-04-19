@@ -26,8 +26,13 @@ def start_main_window(splash, app):
     window.show()
     splash.close()
 
+def log_uncaught_exceptions(exc_type, exc_value, exc_traceback):
+    import logging
+    logging.getLogger().error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
 def main():
     setup_logging()
+    sys.excepthook = log_uncaught_exceptions
     ensure_directories()
     
     app = QApplication(sys.argv)

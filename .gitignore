@@ -4,6 +4,8 @@
 /logs
 /proctorai-alpha
 /proctorai-beta
+/.clinerules
+/tempcaptures
 proctorai.spec
 experiment.py
 1OIDspec.py

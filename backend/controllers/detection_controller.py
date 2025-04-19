@@ -3,6 +3,7 @@ import cv2
 import requests
 import logging
 from backend.utils.thread_utils import BaseThread, BaseManager
+from backend.utils.deduplication_utils import DetectionDeduplicator
 
 DETECTION_SLEEP_MS = 1000
 logger = logging.getLogger('detection')
@@ -62,7 +63,8 @@ class DetectionManager(BaseManager):
                 result = self.model.predict(image_rgb, confidence=confidence_threshold, overlap=30).json()
                 predictions = result['predictions']
                 self.connection_status_changed.emit(True)
-                return predictions
+                capture_class = self.main_window.detection_controls.get_selected_capture_class()
+                return DetectionDeduplicator.deduplicate(predictions, capture_class)
             except requests.exceptions.RequestException as e:
                 if isinstance(e, requests.exceptions.HTTPError):
                     if "401" in str(e):

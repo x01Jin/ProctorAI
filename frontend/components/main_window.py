@@ -9,7 +9,7 @@ from .report_manager import ReportManagerDock
 from .status_bar import StatusBarManager
 from .toolbar import ToolbarManager
 from frontend.themes.theme_manager import ThemeManager
-from backend.utils.gui_utils import GUIManager
+from backend.utils.gui.image_capture_manager import ImageCaptureManager
 from backend.services.application_state import ApplicationState
 from backend.controllers.report_controller import save_pdf
 
@@ -93,7 +93,7 @@ class MainWindow(QMainWindow):
         self.status_bar.update_detections_count(len(detections))
         for detection in detections:
             if detection['class'] == selected_class:
-                GUIManager.capture_image(detection, self.camera_manager.current_image, self)
+                ImageCaptureManager.capture_image(detection, self.camera_manager.current_image, self)
 
     def closeEvent(self, event):
         reply = QMessageBox.question(

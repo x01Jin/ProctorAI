@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QPushButton, QScrollArea
 from PyQt6.QtCore import Qt, pyqtSignal, QFileSystemWatcher
-from backend.utils.gui_utils import GUIManager
 from pathlib import Path
+from backend.utils.gui.image_label_manager import ImageLabelManager
 
 class ReportManagerDock(QDockWidget):
     pdf_generation_requested = pyqtSignal()
@@ -10,8 +10,6 @@ class ReportManagerDock(QDockWidget):
         super().__init__(title, parent)
         self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         self.temp_dir = Path("tempcaptures")
-        self.being_deleted = set()
-        self.displayed_files = set()
         self._init_ui()
         self._init_file_watcher()
 
@@ -40,28 +38,20 @@ class ReportManagerDock(QDockWidget):
         self._load_existing_images()
 
     def _load_existing_images(self):
-        for file in self.temp_dir.glob("*.jpg"):
-            GUIManager.add_image_label_to_layout(str(file), self.image_layout)
+        self._rebuild_image_layout()
 
     def _handle_directory_change(self, path):
-        current_files = {str(f) for f in self.temp_dir.glob("*.jpg")}
-        self.displayed_files.clear()
-        for i in range(self.image_layout.count()):
-            widget = self.image_layout.itemAt(i).widget()
-            if widget and not widget.isHidden() and hasattr(widget, 'image_path'):
-                self.displayed_files.add(widget.image_path)
-        new_files = current_files - self.displayed_files - self.being_deleted
-        for file_path in new_files:
-            if Path(file_path).exists():
-                GUIManager.add_image_label_to_layout(file_path, self.image_layout)
-                self.displayed_files.add(file_path)
-        removed_files = self.displayed_files - current_files - self.being_deleted
-        for file_path in removed_files:
-            GUIManager.remove_image_from_layout(file_path, self.image_layout)
-            self.displayed_files.discard(file_path)
-        self.being_deleted = {f for f in self.being_deleted if Path(f).exists()}
-        if new_files or removed_files:
-            self.image_container.update()
+        self._rebuild_image_layout()
+
+    def _rebuild_image_layout(self):
+        while self.image_layout.count():
+            item = self.image_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        for file in sorted(self.temp_dir.glob("*.jpg")):
+            ImageLabelManager.add_image_label_to_layout(str(file), self.image_layout)
+        self.image_container.update()
 
     def cleanup(self):
         self.file_watcher.removePath(str(self.temp_dir))

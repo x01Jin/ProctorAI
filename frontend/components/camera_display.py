@@ -3,7 +3,7 @@ from .buttons import AnimatedStateButton
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QImage
 import cv2
-from backend.utils.gui_utils import GUIManager
+from backend.utils.gui.frame_display_manager import FrameDisplayManager
 
 class CameraDisplayDock(QDockWidget):
     camera_toggle_requested = pyqtSignal()
@@ -11,6 +11,7 @@ class CameraDisplayDock(QDockWidget):
     def __init__(self, title, parent=None):
         super().__init__(title, parent)
         self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self._last_frame = None
         self._init_ui()
 
     def _init_ui(self):
@@ -50,15 +51,20 @@ class CameraDisplayDock(QDockWidget):
             self._last_size = new_size
         self.display_label.setFixedSize(target_width, target_height)
 
-    def update_display(self, frame, clear_markers=False):
+    def update_display(self, frame=None, clear_markers=False):
         main_window = self.parent().window()
+        if frame is not None:
+            self._last_frame = frame
+        frame_to_display = self._last_frame
+        if frame_to_display is None:
+            return
         if clear_markers:
-            height, width = frame.shape[:2]
+            height, width = frame_to_display.shape[:2]
             bytes_per_line = 3 * width
-            q_image = QImage(frame.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
+            q_image = QImage(frame_to_display.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
             self.display_label.setPixmap(QPixmap.fromImage(q_image))
         else:
-            GUIManager.display_frame(frame, self.display_label, main_window)
+            FrameDisplayManager.display_frame(frame_to_display, self.display_label, main_window)
 
     def reset_display(self):
         main_window = self.parent().window()

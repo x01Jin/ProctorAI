@@ -1,7 +1,7 @@
 import os
 import logging
 from backend.services.application_state import ApplicationState
-from backend.utils.gui_utils import GUIManager
+from backend.utils.gui.temp_capture_cleaner import TempCaptureCleaner
 from backend.utils.pdf_template import PDFReport, REPORT_DIR_NAME
 from backend.utils.report_dialog import prompt_report_details
 from PyQt6.QtWidgets import QMessageBox
@@ -58,7 +58,7 @@ def save_pdf():
         pdf.output(pdf_filename)
         logger.info("PDF report saved: %s", pdf_filename)
         QMessageBox.information(None, "PDF Saved", f"PDF saved as {pdf_filename}")
-        GUIManager.cleanup()
+        TempCaptureCleaner.cleanup()
         return True
     except Exception as e:
         logger.error("Failed to save PDF report: %s", str(e))
