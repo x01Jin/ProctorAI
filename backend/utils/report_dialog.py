@@ -172,10 +172,8 @@ class ReportDetailsDialog(QDialog):
         block = f"{e['block_year'].text()}-{e['block_course'].text().lower()}-{e['block_number'].text()}"
         room = f"{e['room_building'].currentText()}{e['room_number'].text()}"
         raw_date = e['date'].date().toString("yyyy-MM-dd")
-        year, month, day = raw_date.split('-')
-        formatted_date = f"{month}-{day}-{year}"
         return (
-            e['proctor'].text(), block, formatted_date,
+            e['proctor'].text(), block, raw_date,
             e['subject'].text(), room, start_time, end_time,
             e['num_students'].text()
         )
