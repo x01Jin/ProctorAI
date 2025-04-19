@@ -50,7 +50,7 @@ class ReportDetailsDialog(QDialog):
         year.setPlaceholderText("42")
         course = QLineEdit()
         course.setValidator(QRegularExpressionValidator(QRegularExpression("^[a-zA-Z]{2,5}$")))
-        course.setPlaceholderText("cse")
+        course.setPlaceholderText("CSE")
         number = QLineEdit()
         number.setValidator(QRegularExpressionValidator(QRegularExpression("^[0-9]{2}$")))
         number.setPlaceholderText("01")
@@ -169,7 +169,8 @@ class ReportDetailsDialog(QDialog):
             return f"{h:02d}:{minute}"
         start_time = to_24h(e['start_hour'].currentText(), e['start_minute'].currentText(), e['start_period'].currentText())
         end_time = to_24h(e['end_hour'].currentText(), e['end_minute'].currentText(), e['end_period'].currentText())
-        block = f"{e['block_year'].text()}-{e['block_course'].text().lower()}-{e['block_number'].text()}"
+        block_course = e['block_course'].text().upper()
+        block = f"{e['block_year'].text()}-{block_course}-{e['block_number'].text()}"
         room = f"{e['room_building'].currentText()}{e['room_number'].text()}"
         raw_date = e['date'].date().toString("yyyy-MM-dd")
         return (
