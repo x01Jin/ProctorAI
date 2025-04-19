@@ -2,6 +2,7 @@ from roboflow import Roboflow
 from config.settings_manager import SettingsManager
 import sys
 import logging
+from backend.utils.log_config import LoggerStreamHandler
 
 def singleton(cls):
     instances = {}
@@ -49,9 +50,13 @@ class RoboflowManager:
     def initialize(self, splash_screen=None):
         settings = SettingsManager()
         original_stdout = sys.stdout
+        fallback_logger = None
         try:
             if splash_screen:
                 sys.stdout = SplashLogWriter(splash_screen)
+            elif sys.stdout is None:
+                fallback_logger = LoggerStreamHandler(logging.getLogger('roboflow'))
+                sys.stdout = fallback_logger
             api_key = settings.get_setting("roboflow", "api_key")
             project_name = settings.get_setting("roboflow", "project")
             model_version = settings.get_setting("roboflow", "model_version")
@@ -73,7 +78,7 @@ class RoboflowManager:
             RoboflowManager.last_error = error_msg
             return False
         finally:
-            if splash_screen:
+            if splash_screen or fallback_logger:
                 sys.stdout = original_stdout
 
 def get_roboflow():
