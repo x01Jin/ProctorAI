@@ -53,23 +53,6 @@ def connect(settings):
         _connection = None
     return False
 
-def test_connection(settings):
-    global _connection
-    try:
-        connect(settings)
-        if _connection and _connection.is_connected():
-            return True
-        return False
-    except Error as e:
-        error_msg = str(e)
-        set_last_error(error_msg)
-        DB_LOGGER.error(f"Connection test failed: {error_msg}")
-        return False
-    finally:
-        if _connection and _connection.is_connected():
-            _connection.close()
-            _connection = None
-
 def ensure_connection(settings):
     global _connection
     if _connection is None or not _connection.is_connected():

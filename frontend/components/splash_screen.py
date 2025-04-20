@@ -177,16 +177,15 @@ class SplashScreen(QWidget):
     def _check_database(self, on_complete, retry_count=3, attempt=0):
         app_state = ApplicationState.get_instance()
         app_state.initialize_database(settings_manager)
-        db = app_state.database
         self._log_message("Checking database connection...")
         def try_db():
-            if db.test_connection(settings_manager):
+            if app_state.db_connected:
                 self._log_message("Database connection established", "success")
                 app_state.update_connection_status(database=True)
                 QTimer.singleShot(100, lambda: on_complete(True))
             else:
                 if attempt < retry_count - 1:
-                    self._log_message(f"Database connection failed: Connection test failed, retrying... ({attempt + 1}/{retry_count})", "warning")
+                    self._log_message(f"Database connection failed: Connection failed, retrying... ({attempt + 1}/{retry_count})", "warning")
                     QTimer.singleShot(1000, lambda: self._check_database(on_complete, retry_count, attempt + 1))
                 else:
                     self._log_message("Opening setup to check the database settings...", "warning")
