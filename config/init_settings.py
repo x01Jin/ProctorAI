@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QPushButton, 
     QHBoxLayout, QMessageBox
 )
-from .settings_manager import SettingsManager
+from .settings_manager import validate_settings
 from .settings_dialog import SettingsDialog
 
 class ValidationDialog(QDialog):
@@ -14,7 +14,6 @@ class ValidationDialog(QDialog):
         
     def setup_ui(self):
         layout = QVBoxLayout()
-        
         message = (
             "ProctorAI requires initial configuration:\n"
             "• Roboflow API credentials\n"
@@ -24,18 +23,13 @@ class ValidationDialog(QDialog):
         )
         label = QLabel(message)
         layout.addWidget(label)
-        
         button_layout = QHBoxLayout()
-        
         settings_btn = QPushButton("Open Settings")
         settings_btn.clicked.connect(self.open_settings)
-        
         exit_btn = QPushButton("Exit Application")
         exit_btn.clicked.connect(self.reject)
-        
         button_layout.addWidget(settings_btn)
         button_layout.addWidget(exit_btn)
-        
         layout.addLayout(button_layout)
         self.setLayout(layout)
     
@@ -43,23 +37,18 @@ class ValidationDialog(QDialog):
         self.accept()
 
 def initialize_settings(parent=None):
-    settings = SettingsManager()
     while True:
         try:
-            settings.validate_settings()
+            validate_settings()
             return True
-            
         except ValueError:
             dialog = ValidationDialog(parent)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 return False
-                
-            settings_dialog = SettingsDialog(settings, parent)
+            settings_dialog = SettingsDialog(parent=parent)
             if settings_dialog.exec() != QDialog.DialogCode.Accepted:
                 return False
-                
             continue
-            
         except Exception as e:
             QMessageBox.critical(
                 parent,

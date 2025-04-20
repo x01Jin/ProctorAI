@@ -1,17 +1,18 @@
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, QThread, QObject
 from pygrabber.dshow_graph import FilterGraph
 import cv2
 import logging
-from backend.utils.thread_utils import BaseThread, BaseManager
+from backend.utils.thread_utils import start_qthread, stop_qthread
 
 CAMERA_ERROR_THRESHOLD = 5
 CAMERA_SLEEP_MS = 16
 logger = logging.getLogger('camera')
 
-class CameraThread(BaseThread):
+class CameraThread(QThread):
     def __init__(self, manager):
         super().__init__()
         self.manager = manager
+        self._is_running = True
 
     def run(self):
         logger.info("Starting camera capture thread")
@@ -30,7 +31,10 @@ class CameraThread(BaseThread):
             self.msleep(CAMERA_SLEEP_MS)
         logger.info("Camera capture thread stopped")
 
-class CameraManager(BaseManager):
+    def stop(self):
+        self._is_running = False
+
+class CameraManager(QObject):
     frame_ready = pyqtSignal(object)
 
     def __init__(self, main_window):
@@ -41,6 +45,7 @@ class CameraManager(BaseManager):
         self.camera_devices = self.list_cameras()
         self.selected_camera = self.camera_devices[0] if self.camera_devices else ''
         self.main_window.camera_display.camera_combo.currentIndexChanged.connect(self.on_camera_selected)
+        self._thread = None
 
     def _get_opencv_devices(self):
         devices = []
@@ -103,7 +108,8 @@ class CameraManager(BaseManager):
                 height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
                 fps = self.cap.get(cv2.CAP_PROP_FPS)
                 logger.info(f"Camera initialized - Resolution: {width}x{height}, FPS: {fps}")
-                self.start_thread(CameraThread, self)
+                self._thread = CameraThread(self)
+                start_qthread(self._thread)
                 logger.info("Camera thread started successfully")
             else:
                 logger.error(f"Failed to initialize camera {self.selected_camera} - Device not responding")
@@ -114,7 +120,10 @@ class CameraManager(BaseManager):
         logger.info("Releasing camera resources")
         if hasattr(self, "camera_active"):
             self.camera_active = False
-        self.stop_thread()
+        if self._thread and self._thread.isRunning():
+            self._thread.stop()
+            stop_qthread(self._thread)
+            self._thread = None
         if self.cap and self.cap.isOpened():
             self.cap.release()
             self.cap = None

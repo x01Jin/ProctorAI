@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QApplicatio
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor
 from backend.services.application_state import ApplicationState
-from config.settings_manager import SettingsManager
+from config import settings_manager
 from config.settings_dialog import SettingsDialog
 import time
 
@@ -116,13 +116,12 @@ class SplashScreen(QWidget):
         QTimer.singleShot(1000, lambda: self._finish_check_config(on_complete))
 
     def _finish_check_config(self, on_complete):
-        settings = SettingsManager()
-        if not settings.config_exists():
+        if not settings_manager.config_exists():
             self._log_message("No configuration file found...", "warning")
             self._log_message("Creating configuration file with default values...")
-            settings.create_default_config()
+            settings_manager.create_default_config()
             self._log_message("Configuration file created... launching setup...", "info")
-            settings_dialog = SettingsDialog(settings, parent=self, setup_mode=True)
+            settings_dialog = SettingsDialog(settings_manager, parent=self, setup_mode=True)
             if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
                 self._log_message("Setup cancelled... proceeding anyway...", "warning")
             QTimer.singleShot(100, lambda: on_complete(True))
@@ -166,7 +165,7 @@ class SplashScreen(QWidget):
                     QTimer.singleShot(1000, lambda: self._check_roboflow(on_complete, retry_count, attempt + 1))
                 else:
                     self._log_message("Opening setup to check the Roboflow settings...", "warning")
-                    settings_dialog = SettingsDialog(SettingsManager(), parent=self, setup_mode=True, setup_type="roboflow")
+                    settings_dialog = SettingsDialog(settings_manager, parent=self, setup_mode=True, setup_type="roboflow")
                     if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
                         self._log_message("Roboflow setup cancelled... exiting the application...", "error")
                         app_state.update_connection_status(roboflow=False)
@@ -177,11 +176,11 @@ class SplashScreen(QWidget):
 
     def _check_database(self, on_complete, retry_count=3, attempt=0):
         app_state = ApplicationState.get_instance()
-        app_state.initialize_database()
+        app_state.initialize_database(settings_manager)
         db = app_state.database
         self._log_message("Checking database connection...")
         def try_db():
-            if db.test_connection():
+            if db.test_connection(settings_manager):
                 self._log_message("Database connection established", "success")
                 app_state.update_connection_status(database=True)
                 QTimer.singleShot(100, lambda: on_complete(True))
@@ -191,7 +190,7 @@ class SplashScreen(QWidget):
                     QTimer.singleShot(1000, lambda: self._check_database(on_complete, retry_count, attempt + 1))
                 else:
                     self._log_message("Opening setup to check the database settings...", "warning")
-                    settings_dialog = SettingsDialog(SettingsManager(), parent=self, setup_mode=True, setup_type="database")
+                    settings_dialog = SettingsDialog(settings_manager, parent=self, setup_mode=True, setup_type="database")
                     if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
                         self._log_message("Database setup cancelled... exiting the application...", "error")
                         app_state.update_connection_status(database=False)

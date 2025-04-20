@@ -17,7 +17,7 @@ def save_pdf():
     try:
         app_state = ApplicationState.get_instance()
         if app_state.database:
-            app_state.database.insert_report_details(proctor, block, date, subject, room, start, end, num_students)
+            app_state.database.insert_report_details(app_state.settings, proctor, block, date, subject, room, start, end, num_students)
             logger.info("Inserted report details into database for block=%s, subject=%s, date=%s", block, subject, date)
         else:
             logger.error("Database connection not initialized")

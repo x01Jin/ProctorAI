@@ -2,6 +2,8 @@ import cv2
 import random
 import string
 import logging
+import time
+from backend.utils.deduplication_utils import _in_deadzone, add_deadzone
 
 class ImageCaptureManager:
     logger = logging.getLogger('report')
@@ -11,8 +13,7 @@ class ImageCaptureManager:
         selected_class = window.get_selected_capture_class()
         if detection['class'] != selected_class:
             return
-        from backend.utils.deduplication_utils import DetectionDeduplicator
-        if DetectionDeduplicator._in_deadzone(detection):
+        if _in_deadzone(detection):
             ImageCaptureManager.logger.info(f"Skipped capture: detection in deadzone {detection}")
             return
         x_center, y_center = detection['x'], detection['y']
@@ -35,6 +36,4 @@ class ImageCaptureManager:
         image_filename = f"tempcaptures/untagged({random_id}).jpg"
         cv2.imwrite(image_filename, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
         ImageCaptureManager.logger.info(f"Captured image saved to: {image_filename}")
-        from backend.utils.deduplication_utils import DetectionDeduplicator
-        import time
-        DetectionDeduplicator._add_deadzone(detection, time.time())
+        add_deadzone(detection, time.time())

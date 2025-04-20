@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import QMainWindow, QSplitter, QMessageBox, QDockWidget
 from PyQt6.QtCore import Qt
 from backend.controllers.camera_controller import CameraManager
-from backend.controllers.detection_controller import DetectionManager
-from config.settings_manager import SettingsManager
+from backend.controllers.detection_controller import DetectionWorker, toggle_detection
+import config.settings_manager as settings_manager
 from .camera_display import CameraDisplayDock
 from .detection_controls import DetectionControlsDock
 from .report_manager import ReportManagerDock
@@ -16,14 +16,16 @@ from backend.controllers.report_controller import save_pdf
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ProctorAI Release v1.3.9r")
+        self.detections = []
+        self.setWindowTitle("ProctorAI Release v1.4.0b")
         screen = self.screen().availableGeometry()
         width = int(screen.width() * 0.9)
         height = int(screen.height() * 0.9)
         self.resize(width, height)
         self.move((screen.width() - width) // 2, (screen.height() - height) // 2)
         self.app_state = ApplicationState.get_instance()
-        self.settings = SettingsManager()
+        settings_manager.load_settings()
+        self.settings = settings_manager
         self.theme_manager = ThemeManager(self)
         self._setup_window()
         self._setup_components()
@@ -55,10 +57,10 @@ class MainWindow(QMainWindow):
             return False
         if not hasattr(self, 'camera_manager'):
             self.camera_manager = CameraManager(self)
-        if not hasattr(self, 'detection_manager'):
-            self.detection_manager = DetectionManager(rf.model, self)
+        if not hasattr(self, 'detection_worker'):
+            self.detection_worker = DetectionWorker(rf.model, self)
         else:
-            self.detection_manager.model = rf.model
+            self.detection_worker.model = rf.model
         self.detection_controls.update_model_classes(rf.classes)
         return True
 
@@ -67,8 +69,8 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self):
         self.camera_manager.frame_ready.connect(self.camera_display.update_display)
-        self.detection_manager.detections_ready.connect(self._process_detections)
-        self.detection_manager.detection_stopped.connect(self._on_detection_stopped)
+        self.detection_worker.detections_ready.connect(self._process_detections)
+        self.detection_worker.detection_stopped.connect(self._on_detection_stopped)
         self.camera_display.camera_toggle_requested.connect(self._toggle_camera)
         self.detection_controls.detection_toggle_requested.connect(self._toggle_detection)
         self.report_manager.pdf_generation_requested.connect(self._generate_pdf)
@@ -81,12 +83,13 @@ class MainWindow(QMainWindow):
         self.camera_manager.toggle_camera()
 
     def _toggle_detection(self):
-        self.detection_manager.toggle_detection()
+        toggle_detection(self.detection_worker, self)
 
     def _generate_pdf(self):
         save_pdf()
 
     def _process_detections(self, detections):
+        self.detections = detections
         selected_class = self.get_selected_capture_class()
         if not selected_class:
             return
@@ -109,8 +112,8 @@ class MainWindow(QMainWindow):
             event.ignore()
 
     def _on_settings_updated(self):
-        if hasattr(self, 'detection_manager') and self.detection_manager:
-            self.detection_manager.toggle_detection(force_stop=True)
+        if hasattr(self, 'detection_worker') and self.detection_worker:
+            toggle_detection(self.detection_worker, self, force_stop=True)
         if not self.app_state.reinitialize_roboflow():
             error_msg = self.app_state.roboflow.last_error or "Failed to initialize Roboflow model"
             QMessageBox.critical(self, "Error", f"Model update failed: {error_msg}")
