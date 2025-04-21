@@ -3,7 +3,7 @@ from .buttons import AnimatedStateButton
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QImage
 import cv2
-from backend.utils.gui.frame_display_manager import FrameDisplayManager
+from backend.utils.gui.frame_display_manager import display_frame
 
 class CameraDisplayDock(QDockWidget):
     camera_toggle_requested = pyqtSignal()
@@ -64,7 +64,7 @@ class CameraDisplayDock(QDockWidget):
             q_image = QImage(frame_to_display.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
             self.display_label.setPixmap(QPixmap.fromImage(q_image))
         else:
-            FrameDisplayManager.display_frame(frame_to_display, self.display_label, main_window)
+            display_frame(frame_to_display, self.display_label, main_window)
 
     def reset_display(self):
         main_window = self.parent().window()
