@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor
 from backend.services.application_state import ApplicationState
 from config import settings_manager
-from config.settings_dialog import SettingsDialog
+from config.config_bootstrap import ensure_config
 import time
 
 class SplashScreen(QWidget):
@@ -112,22 +112,15 @@ class SplashScreen(QWidget):
         QApplication.processEvents()
 
     def _check_config(self, on_complete):
-        self._log_message("Checking configuration...")
-        QTimer.singleShot(1000, lambda: self._finish_check_config(on_complete))
-
-    def _finish_check_config(self, on_complete):
-        if not settings_manager.config_exists():
-            self._log_message("No configuration file found...", "warning")
-            self._log_message("Creating configuration file with default values...")
-            settings_manager.create_default_config()
-            self._log_message("Configuration file created... launching setup...", "info")
-            settings_dialog = SettingsDialog(settings_manager, parent=self, setup_mode=True)
-            if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
-                self._log_message("Setup cancelled... proceeding anyway...", "warning")
-            QTimer.singleShot(100, lambda: on_complete(True))
-        else:
-            self._log_message("Configuration found", "success")
-            QTimer.singleShot(100, lambda: on_complete(True))
+        self._log_message("Checking configuration and settings...")
+        def do_check():
+            if ensure_config(self, self._log_message):
+                self._log_message("Configuration and settings valid", "success")
+                QTimer.singleShot(100, lambda: on_complete(True))
+            else:
+                self._log_message("Setup cancelled... exiting the application...", "error")
+                QTimer.singleShot(1000, lambda: QApplication.instance().quit())
+        QTimer.singleShot(1000, do_check)
 
     def _check_internet(self, on_complete, retry_count=3, attempt=0):
         self._log_message("Checking internet connection...")
@@ -164,14 +157,16 @@ class SplashScreen(QWidget):
                     self._log_message(f"Roboflow connection failed: {rf.last_error or 'Connection test failed'}, retrying... ({attempt + 1}/{retry_count})", "warning")
                     QTimer.singleShot(1000, lambda: self._check_roboflow(on_complete, retry_count, attempt + 1))
                 else:
+                    self._log_message("Retry failed, check settings again.", "info")
                     self._log_message("Opening setup to check the Roboflow settings...", "warning")
-                    settings_dialog = SettingsDialog(settings_manager, parent=self, setup_mode=True, setup_type="roboflow")
-                    if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
+                    from config.settings_dialog import SettingsDialog
+                    dialog = SettingsDialog(parent=self, setup_mode=True, setup_type="roboflow")
+                    if dialog.exec() == dialog.DialogCode.Accepted:
+                        QTimer.singleShot(100, lambda: self._check_roboflow(on_complete, retry_count, attempt + 1))
+                    else:
                         self._log_message("Roboflow setup cancelled... exiting the application...", "error")
                         app_state.update_connection_status(roboflow=False)
                         QTimer.singleShot(1000, lambda: QApplication.instance().quit())
-                        return
-                    QTimer.singleShot(100, lambda: self._check_roboflow(on_complete, retry_count, attempt + 1))
         QTimer.singleShot(1000, try_roboflow)
 
     def _check_database(self, on_complete, retry_count=3, attempt=0):
@@ -188,14 +183,16 @@ class SplashScreen(QWidget):
                     self._log_message(f"Database connection failed: Connection failed, retrying... ({attempt + 1}/{retry_count})", "warning")
                     QTimer.singleShot(1000, lambda: self._check_database(on_complete, retry_count, attempt + 1))
                 else:
+                    self._log_message("Retry failed, check settings again.", "info")
                     self._log_message("Opening setup to check the database settings...", "warning")
-                    settings_dialog = SettingsDialog(settings_manager, parent=self, setup_mode=True, setup_type="database")
-                    if settings_dialog.exec() != SettingsDialog.DialogCode.Accepted:
+                    from config.settings_dialog import SettingsDialog
+                    dialog = SettingsDialog(parent=self, setup_mode=True, setup_type="database")
+                    if dialog.exec() == dialog.DialogCode.Accepted:
+                        QTimer.singleShot(100, lambda: self._check_database(on_complete, retry_count, attempt + 1))
+                    else:
                         self._log_message("Database setup cancelled... exiting the application...", "error")
                         app_state.update_connection_status(database=False)
                         QTimer.singleShot(1000, lambda: QApplication.instance().quit())
-                        return
-                    QTimer.singleShot(100, lambda: self._check_database(on_complete, retry_count, attempt + 1))
         QTimer.singleShot(1000, try_db)
 
     def perform_checks(self, on_complete=None):

@@ -2,21 +2,6 @@ from pathlib import Path
 import configparser
 
 SETTINGS_FILE = "config.ini"
-DEFAULT_SETTINGS = {
-    'theme': {'theme': 'dark'},
-    'roboflow': {
-        'api_key': 'REQUIRED',
-        'project': 'REQUIRED',
-        'model_version': '1',
-        'model_classes': 'REQUIRED'
-    },
-    'database': {
-        'host': 'REQUIRED',
-        'user': 'REQUIRED',
-        'password': '',
-        'database': 'REQUIRED'
-    }
-}
 REQUIRED_SETTINGS = {
     'roboflow': ['api_key', 'project', 'model_classes'],
     'database': ['host', 'user', 'database']
@@ -27,24 +12,11 @@ _settings_data = {}
 def config_exists(settings_file=SETTINGS_FILE):
     return Path(settings_file).exists()
 
-def create_default_config(settings_file=SETTINGS_FILE):
-    config = configparser.ConfigParser()
-    settings = DEFAULT_SETTINGS.copy()
-    for section, values in settings.items():
-        if section not in config:
-            config[section] = {}
-        for key, value in values.items():
-            config[section][key] = str(value)
-    with open(settings_file, 'w') as f:
-        config.write(f)
-    global _settings_data
-    _settings_data = settings
-    return settings
 
 def load_settings(settings_file=SETTINGS_FILE):
     config = configparser.ConfigParser()
-    settings = DEFAULT_SETTINGS.copy()
     config.read(settings_file)
+    settings = {}
     for section in config.sections():
         settings[section] = dict(config[section])
     global _settings_data
@@ -82,8 +54,3 @@ def validate_settings():
             value = section_data.get(field, '').strip()
             if not value or value == 'REQUIRED':
                 raise ValueError(f"Required setting missing: {section}.{field}")
-
-if config_exists():
-    load_settings()
-else:
-    create_default_config()
