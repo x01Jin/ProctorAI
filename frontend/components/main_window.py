@@ -12,11 +12,12 @@ from frontend.themes.theme_manager import ThemeManager
 from backend.utils.gui.image_capture_manager import ImageCaptureManager
 from backend.services.application_state import ApplicationState
 from backend.controllers.report_controller import save_pdf
+from .detectwarn import show_detection_pdf_warning
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ProctorAI Release v1.3.9r")
+        self.setWindowTitle("ProctorAI v1.4.0r by CROISSANTS")
         screen = self.screen().availableGeometry()
         width = int(screen.width() * 0.9)
         height = int(screen.height() * 0.9)
@@ -30,6 +31,8 @@ class MainWindow(QMainWindow):
         self._setup_components()
         self._setup_model()
         self._connect_signals()
+        camera_active = getattr(self.camera_manager, "camera_active", False)
+        self.detection_controls.set_detection_enabled(camera_active)
 
     def _setup_window(self):
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -80,12 +83,21 @@ class MainWindow(QMainWindow):
 
     def _toggle_camera(self):
         self.camera_manager.toggle_camera()
+        camera_active = getattr(self.camera_manager, "camera_active", False)
+        if not camera_active and getattr(self.detection_manager, "detection_active", False):
+            self.detection_manager.toggle_detection(force_stop=True)
+        self.detection_controls.set_detection_enabled(camera_active)
 
     def _toggle_detection(self):
         self.detection_manager.toggle_detection()
 
     def _generate_pdf(self):
-        save_pdf()
+        if getattr(self.detection_manager, "detection_active", False):
+            if show_detection_pdf_warning(self):
+                self.detection_manager.toggle_detection(force_stop=True)
+                save_pdf()
+        else:
+            save_pdf()
 
     def _process_detections(self, detections):
         selected_class = self.get_selected_capture_class()

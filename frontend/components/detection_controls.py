@@ -98,3 +98,6 @@ class DetectionControlsDock(QDockWidget):
     def update_detection_button_text(self, is_running):
         self.detection_button.setText("Stop Detection" if is_running else "Start Detection")
         self.detection_button.set_active(is_running)
+
+    def set_detection_enabled(self, enabled):
+        self.detection_button.setEnabled(enabled)

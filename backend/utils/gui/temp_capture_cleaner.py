@@ -13,6 +13,5 @@ class TempCaptureCleaner:
                 file_path = os.path.join("tempcaptures", filename)
                 try:
                     os.remove(file_path)
-                    TempCaptureCleaner.logger.info(f"Cleaned up file: {file_path}")
                 except Exception as e:
                     TempCaptureCleaner.logger.error(f"Error deleting file {file_path}: {e}")
