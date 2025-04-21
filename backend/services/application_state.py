@@ -1,5 +1,5 @@
 from typing import Optional
-from backend.services.database_service import DatabaseManager
+from backend.services import database_service
 from backend.services.roboflow_service import RoboflowManager
 
 def singleton(cls):
@@ -14,22 +14,22 @@ def singleton(cls):
 @singleton
 class ApplicationState:
     def __init__(self):
-        self._db_instance: Optional[DatabaseManager] = None
         self._rf_instance: Optional[RoboflowManager] = None
         self.db_connected = False
         self.rf_connected = False
-
-    @property
-    def database(self) -> Optional[DatabaseManager]:
-        return self._db_instance
+        self.settings = None
 
     @property
     def roboflow(self) -> Optional[RoboflowManager]:
         return self._rf_instance
 
-    def initialize_database(self) -> None:
-        if self._db_instance is None:
-            self._db_instance = DatabaseManager.get_instance()
+    def initialize_database(self, settings_manager) -> None:
+        self.settings = settings_manager
+        self.db_connected = database_service.connect(settings_manager)
+
+    @property
+    def database(self):
+        return database_service
 
     def initialize_roboflow(self) -> bool:
         if self._rf_instance is None:

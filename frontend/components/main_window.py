@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QMainWindow, QSplitter, QMessageBox, QDockWidget
 from PyQt6.QtCore import Qt
 from backend.controllers.camera_controller import CameraManager
 from backend.controllers.detection_controller import DetectionManager
-from config.settings_manager import SettingsManager
+import config.settings_manager as settings_manager
 from .camera_display import CameraDisplayDock
 from .detection_controls import DetectionControlsDock
 from .report_manager import ReportManagerDock
@@ -23,7 +23,8 @@ class MainWindow(QMainWindow):
         self.resize(width, height)
         self.move((screen.width() - width) // 2, (screen.height() - height) // 2)
         self.app_state = ApplicationState.get_instance()
-        self.settings = SettingsManager()
+        settings_manager.load_settings()
+        self.settings = settings_manager
         self.theme_manager = ThemeManager(self)
         self._setup_window()
         self._setup_components()

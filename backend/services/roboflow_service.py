@@ -1,8 +1,8 @@
 from roboflow import Roboflow
-from config.settings_manager import SettingsManager
+from config import settings_manager
 import sys
 import logging
-from backend.utils.log_config import LoggerStreamHandler
+from backend.utils.log_config import _logger_stream_handler
 
 def singleton(cls):
     instances = {}
@@ -35,7 +35,6 @@ class RoboflowManager:
     def __init__(self):
         self._model = None
         self._classes = []
-        self.settings = SettingsManager()
         self.logger = logging.getLogger('roboflow')
         self.logger.setLevel(logging.INFO)
 
@@ -48,23 +47,22 @@ class RoboflowManager:
         return self._classes
 
     def initialize(self, splash_screen=None):
-        settings = SettingsManager()
         original_stdout = sys.stdout
         fallback_logger = None
         try:
             if splash_screen:
                 sys.stdout = SplashLogWriter(splash_screen)
             elif sys.stdout is None:
-                fallback_logger = LoggerStreamHandler(logging.getLogger('roboflow'))
+                fallback_logger = _logger_stream_handler(logging.getLogger('roboflow'))
                 sys.stdout = fallback_logger
-            api_key = settings.get_setting("roboflow", "api_key")
-            project_name = settings.get_setting("roboflow", "project")
-            model_version = settings.get_setting("roboflow", "model_version")
+            api_key = settings_manager.get_setting("roboflow", "api_key")
+            project_name = settings_manager.get_setting("roboflow", "project")
+            model_version = settings_manager.get_setting("roboflow", "model_version")
             self.logger.info(f"Connecting to Roboflow (Project: {project_name}, Version: {model_version})")
             rf = Roboflow(api_key=api_key)
             project = rf.workspace().project(project_name)
             self._model = project.version(model_version).model
-            model_classes = settings.get_setting("roboflow", "model_classes")
+            model_classes = settings_manager.get_setting("roboflow", "model_classes")
             if not model_classes:
                 raise ValueError("No model classes specified in settings")
             self._classes = [cls.strip() for cls in model_classes.split(",") if cls.strip()]

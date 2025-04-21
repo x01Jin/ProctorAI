@@ -5,22 +5,61 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import pyqtSignal
 from frontend.themes.theme_manager import ThemeManager
+from .settings_manager import get_setting, update_setting, save_settings
+
+def validate_settings_dialog_inputs(api_key, project, model_classes, db_host, db_user, db_name, show_error):
+    if not api_key.text().strip() or api_key.text().strip() == 'REQUIRED':
+        show_error("Roboflow API key is required")
+        return False
+    if not project.text().strip() or project.text().strip() == 'REQUIRED':
+        show_error("Roboflow project name is required")
+        return False
+    if not model_classes.text().strip() or model_classes.text().strip() == 'REQUIRED':
+        show_error("Model classes are required (comma-separated)")
+        return False
+    if not all([db_host.text().strip(), db_user.text().strip(), db_name.text().strip()]):
+        show_error("Database host, user, and name are required")
+        return False
+    return True
+
+def save_settings_dialog(theme_combo, api_key, project, version, model_classes, db_host, db_user, db_pass, db_name, setup_mode, setup_type, settings_updated, parent):
+    try:
+        update_setting("theme", "theme", theme_combo.currentText())
+        update_setting("roboflow", "api_key", api_key.text().strip())
+        update_setting("roboflow", "project", project.text().strip())
+        update_setting("roboflow", "model_version", str(version.value()))
+        update_setting("roboflow", "model_classes", model_classes.text().strip())
+        update_setting("database", "host", db_host.text().strip())
+        update_setting("database", "user", db_user.text().strip())
+        update_setting("database", "password", db_pass.text())
+        update_setting("database", "database", db_name.text().strip())
+        save_settings()
+        if setup_mode:
+            QMessageBox.information(
+                parent,
+                "Success",
+                f"{'Initial setup' if not setup_type else setup_type.capitalize() + ' setup'} completed successfully!"
+            )
+        if settings_updated:
+            settings_updated.emit()
+        return True
+    except Exception as e:
+        QMessageBox.critical(parent, "Error", f"Failed to save settings: {str(e)}")
+        return False
 
 class SettingsDialog(QDialog):
     settings_updated = pyqtSignal()
-    def __init__(self, settings, parent=None, setup_mode=False, setup_type=None):
+    def __init__(self, parent=None, setup_mode=False, setup_type=None):
         super().__init__(parent)
-        self.settings = settings
+        self.settings = __import__('config.settings_manager', fromlist=['settings_manager'])
         self.setup_mode = setup_mode
         self.setup_type = setup_type
         self.setWindowTitle("Setup" if setup_mode else "Settings")
         self.setModal(True)
-        
         self.theme_manager = ThemeManager(self)
-        current_theme = settings.get_setting("theme", "theme")
+        current_theme = get_setting("theme", "theme")
         if current_theme:
             self.theme_manager.apply_theme(current_theme)
-            
         self.setup_ui()
         
     def setup_ui(self):
@@ -28,19 +67,14 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
-        
         theme_group = self._create_theme_group()
         layout.addWidget(theme_group)
-        
         robo_group = self._create_roboflow_group()
         layout.addWidget(robo_group)
-        
         db_group = self._create_database_group()
         layout.addWidget(db_group)
-        
         button_layout = self._create_button_layout()
         layout.addLayout(button_layout)
-        
         self.setLayout(layout)
     
     def _create_theme_group(self):
@@ -48,16 +82,12 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(group)
         layout.setSpacing(8)
         layout.setContentsMargins(15, 15, 15, 15)
-        
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["dark", "light"])
-        self.theme_combo.setCurrentText(self.settings.get_setting("theme", "theme"))
-        
+        self.theme_combo.setCurrentText(get_setting("theme", "theme"))
         theme_label = QLabel("Application Theme:")
-        
         layout.addWidget(theme_label)
         layout.addWidget(self.theme_combo)
-        
         return group
     
     def _create_roboflow_group(self):
@@ -65,23 +95,17 @@ class SettingsDialog(QDialog):
         layout = QFormLayout()
         layout.setSpacing(8)
         layout.setContentsMargins(15, 15, 15, 15)
-        
-        self.api_key = QLineEdit(self.settings.get_setting("roboflow", "api_key"))
+        self.api_key = QLineEdit(get_setting("roboflow", "api_key"))
         self.api_key.setEchoMode(QLineEdit.EchoMode.Password)
-        
-        self.project = QLineEdit(self.settings.get_setting("roboflow", "project"))
-        
+        self.project = QLineEdit(get_setting("roboflow", "project"))
         self.version = QSpinBox()
         self.version.setMinimum(1)
-        self.version.setValue(int(self.settings.get_setting("roboflow", "model_version")))
-        
-        self.model_classes = QLineEdit(self.settings.get_setting("roboflow", "model_classes"))
-        
+        self.version.setValue(int(get_setting("roboflow", "model_version")))
+        self.model_classes = QLineEdit(get_setting("roboflow", "model_classes"))
         layout.addRow("API Key:", self.api_key)
         layout.addRow("Project:", self.project)
         layout.addRow("Version:", self.version)
         layout.addRow("Model Classes:", self.model_classes)
-        
         group.setLayout(layout)
         return group
     
@@ -90,59 +114,31 @@ class SettingsDialog(QDialog):
         layout = QFormLayout()
         layout.setSpacing(8)
         layout.setContentsMargins(15, 15, 15, 15)
-        
-        self.db_host = QLineEdit(self.settings.get_setting("database", "host"))
-        self.db_user = QLineEdit(self.settings.get_setting("database", "user"))
-        self.db_pass = QLineEdit(self.settings.get_setting("database", "password"))
+        self.db_host = QLineEdit(get_setting("database", "host"))
+        self.db_user = QLineEdit(get_setting("database", "user"))
+        self.db_pass = QLineEdit(get_setting("database", "password"))
         self.db_pass.setEchoMode(QLineEdit.EchoMode.Password)
-        self.db_name = QLineEdit(self.settings.get_setting("database", "database"))
-        
+        self.db_name = QLineEdit(get_setting("database", "database"))
         layout.addRow("Host:", self.db_host)
         layout.addRow("User:", self.db_user)
         layout.addRow("Password:", self.db_pass)
         layout.addRow("Database:", self.db_name)
-        
         group.setLayout(layout)
         return group
     
     def _create_button_layout(self):
         layout = QHBoxLayout()
         layout.setSpacing(10)
-        
         save_btn = QPushButton("Save")
         save_btn.setMinimumWidth(100)
         save_btn.clicked.connect(self._save_settings)
-        
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setMinimumWidth(100)
         cancel_btn.clicked.connect(self._handle_cancel)
-        
         layout.addStretch()
         layout.addWidget(save_btn)
         layout.addWidget(cancel_btn)
-        
         return layout
-    
-    def _validate_inputs(self):
-        if not self.api_key.text().strip() or self.api_key.text().strip() == 'REQUIRED':
-            self._show_error("Roboflow API key is required")
-            return False
-            
-        if not self.project.text().strip() or self.project.text().strip() == 'REQUIRED':
-            self._show_error("Roboflow project name is required")
-            return False
-            
-        if not self.model_classes.text().strip() or self.model_classes.text().strip() == 'REQUIRED':
-            self._show_error("Model classes are required (comma-separated)")
-            return False
-            
-        if not all([self.db_host.text().strip(),
-                   self.db_user.text().strip(),
-                   self.db_name.text().strip()]):
-            self._show_error("Database host, user, and name are required")
-            return False
-            
-        return True
     
     def _show_error(self, message):
         QMessageBox.critical(self, "Validation Error", message)
@@ -152,7 +148,6 @@ class SettingsDialog(QDialog):
             msg = "Are you sure you want to cancel the setup?"
             if self.setup_type in ["roboflow", "database"]:
                 msg = "Cancelling the setup will exit the application"
-            
             reply = QMessageBox.question(
                 self,
                 "Confirm Cancel",
@@ -160,40 +155,22 @@ class SettingsDialog(QDialog):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
-            
             if reply == QMessageBox.StandardButton.Yes:
                 self.reject()
         else:
             self.reject()
 
     def _save_settings(self):
-        if not self._validate_inputs():
+        valid = validate_settings_dialog_inputs(
+            self.api_key, self.project, self.model_classes,
+            self.db_host, self.db_user, self.db_name, self._show_error
+        )
+        if not valid:
             return
-            
-        try:
-            self.settings.update_setting("theme", "theme", self.theme_combo.currentText())
-            
-            self.settings.update_setting("roboflow", "api_key", self.api_key.text().strip())
-            self.settings.update_setting("roboflow", "project", self.project.text().strip())
-            self.settings.update_setting("roboflow", "model_version", str(self.version.value()))
-            self.settings.update_setting("roboflow", "model_classes", self.model_classes.text().strip())
-            
-            self.settings.update_setting("database", "host", self.db_host.text().strip())
-            self.settings.update_setting("database", "user", self.db_user.text().strip())
-            self.settings.update_setting("database", "password", self.db_pass.text())
-            self.settings.update_setting("database", "database", self.db_name.text().strip())
-            
-            self.settings.save_settings()
-            
-            if self.setup_mode:
-                QMessageBox.information(
-                    self,
-                    "Success",
-                    f"{'Initial setup' if not self.setup_type else self.setup_type.capitalize() + ' setup'} completed successfully!"
-                )
-            
-            self.settings_updated.emit()
+        result = save_settings_dialog(
+            self.theme_combo, self.api_key, self.project, self.version, self.model_classes,
+            self.db_host, self.db_user, self.db_pass, self.db_name,
+            self.setup_mode, self.setup_type, self.settings_updated, self
+        )
+        if result:
             self.accept()
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save settings: {str(e)}")

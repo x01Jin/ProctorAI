@@ -50,19 +50,17 @@ def setup_logging():
             root_logger.addHandler(console_handler)
 
         if sys.stdout is not None and sys.stderr is not None:
-            sys.stdout = LoggerStreamHandler(logging.getLogger('stdout'))
-            sys.stderr = LoggerStreamHandler(logging.getLogger('stderr'))
+            sys.stdout = _logger_stream_handler(logging.getLogger('stdout'))
+            sys.stderr = _logger_stream_handler(logging.getLogger('stderr'))
     except Exception as e:
         if not getattr(sys, 'frozen', False):
             print(f"Error setting up logging: {str(e)}")
 
-class LoggerStreamHandler:
-    def __init__(self, logger):
-        self.logger = logger
-
-    def write(self, message):
-        if message and not message.isspace():
-            self.logger.info(message.strip())
-
-    def flush(self):
-        pass
+def _logger_stream_handler(logger):
+    class Stream:
+        def write(self, message):
+            if message and not message.isspace():
+                logger.info(message.strip())
+        def flush(self):
+            pass
+    return Stream()
