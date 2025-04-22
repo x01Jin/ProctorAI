@@ -57,18 +57,18 @@ class ConfigConfirmDialog(QDialog):
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
-def ensure_config(parent, log_cb):
+def ensure_config(parent, log_display):
     if config_exists():
         load_settings()
         return True
-    log_cb("No configuration file found, Attempting to create the configuration file with default values...", "warning")
+    log_display.log("No configuration file found, Attempting to create the configuration file with default values...", "warning")
     QApplication.processEvents()
     dialog = ConfigConfirmDialog(parent)
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return False
     create_default_config()
     load_settings()
-    log_cb("Configuration file created, Launching setup...", "success")
+    log_display.log("Configuration file created, Launching setup...", "success")
     dialog = SettingsDialog(parent=parent, setup_mode=True)
     if dialog.exec() == dialog.DialogCode.Accepted:
         return True

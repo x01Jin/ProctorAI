@@ -1,10 +1,9 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QApplication
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QBrush, QTextCursor
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 from backend.services.application_state import ApplicationState
-from config import settings_manager
-from config.config_bootstrap import ensure_config
-import time
+from frontend.components.log_display import LogDisplay
+from backend.utils.check_utils import run_checks
 
 class SplashScreen(QWidget):
     def __init__(self, parent=None):
@@ -23,20 +22,11 @@ class SplashScreen(QWidget):
                 border: none;
                 color: #f5f6fa;
             }
-            QTextEdit {
-                background-color: #181a20;
-                color: #f5f6fa;
-                border: 1px solid #444857;
-                border-radius: 5px;
-                padding: 5px;
-            }
         """)
+        self.log_display = LogDisplay()
         self._setup_ui()
         self._center_on_screen()
-        self._log_message("Starting ProctorAI...", "info")
-
-    def log_message(self, message, level="info"):
-        self._log_message(message, level)
+        self.log_display.log("Starting ProctorAI...", "info")
 
     def _center_on_screen(self):
         screen = QApplication.primaryScreen().geometry()
@@ -76,142 +66,12 @@ class SplashScreen(QWidget):
         creators_label.setFont(creators_font)
         creators_label.setStyleSheet("color: #f5f6fa;")
         layout.addWidget(creators_label)
-        self.log_display = QTextEdit()
-        self.log_display.setReadOnly(True)
-        self.log_display.setFixedHeight(200)
-        self.log_display.setStyleSheet("""
-            QTextEdit {
-                background-color: #181a20;
-                color: #f5f6fa;
-                border: 1px solid #444857;
-                border-radius: 5px;
-                padding: 5px;
-            }
-        """)
-        layout.addWidget(self.log_display)
+        layout.addWidget(self.log_display.widget())
         self.setLayout(layout)
-
-    def _log_message(self, message, level="info"):
-        timestamp = time.strftime("%H:%M:%S")
-        format = QTextCharFormat()
-        if level == "success":
-            format.setForeground(QBrush(QColor(76, 175, 80)))
-            prefix = "✓"
-        elif level == "warning":
-            format.setForeground(QBrush(QColor(255, 193, 7)))
-            prefix = "⚠️"
-        elif level == "error":
-            format.setForeground(QBrush(QColor(244, 67, 54)))
-            prefix = "❌"
-        else:
-            format.setForeground(QBrush(QColor(245, 246, 250)))
-            prefix = "→"
-        self.log_display.moveCursor(QTextCursor.MoveOperation.End)
-        self.log_display.textCursor().insertText(f"[{timestamp}] {prefix} {message}\n", format)
-        self.log_display.verticalScrollBar().setValue(self.log_display.verticalScrollBar().maximum())
-        QApplication.processEvents()
-
-    def _check_config(self, on_complete):
-        self._log_message("Checking configuration and settings...")
-        def do_check():
-            if ensure_config(self, self._log_message):
-                self._log_message("Configuration and settings valid", "success")
-                QTimer.singleShot(100, lambda: on_complete(True))
-            else:
-                self._log_message("Setup cancelled... exiting the application...", "error")
-                QTimer.singleShot(1000, lambda: QApplication.instance().quit())
-        QTimer.singleShot(1000, do_check)
-
-    def _check_internet(self, on_complete, retry_count=3, attempt=0):
-        self._log_message("Checking internet connection...")
-        import subprocess
-        import platform
-        def try_ping():
-            try:
-                command = ["ping", "-n" if platform.system().lower()=="windows" else "-c", "1", "8.8.8.8"]
-                subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-                self._log_message("Internet connection established", "success")
-                QTimer.singleShot(100, lambda: on_complete(True))
-            except subprocess.CalledProcessError:
-                if attempt < retry_count - 1:
-                    self._log_message(f"Internet connection failed, retrying... ({attempt + 1}/{retry_count})", "warning")
-                    QTimer.singleShot(1000, lambda: self._check_internet(on_complete, retry_count, attempt + 1))
-                else:
-                    self._log_message("Internet connection failed after 3 attempts", "error")
-                    self._log_message("Some features may be limited without internet connection", "warning")
-                    QTimer.singleShot(100, lambda: on_complete(False))
-        QTimer.singleShot(1000, try_ping)
-
-    def _check_roboflow(self, on_complete, retry_count=3, attempt=0):
-        app_state = ApplicationState.get_instance()
-        app_state.initialize_roboflow()
-        rf = app_state.roboflow
-        self._log_message("Checking Roboflow connection...")
-        def try_roboflow():
-            if rf.initialize(splash_screen=self):
-                self._log_message("Roboflow connection established", "success")
-                app_state.update_connection_status(roboflow=True)
-                QTimer.singleShot(100, lambda: on_complete(True))
-            else:
-                if attempt < retry_count - 1:
-                    self._log_message(f"Roboflow connection failed: {rf.last_error or 'Connection test failed'}, retrying... ({attempt + 1}/{retry_count})", "warning")
-                    QTimer.singleShot(1000, lambda: self._check_roboflow(on_complete, retry_count, attempt + 1))
-                else:
-                    self._log_message("Retry failed, check settings again.", "info")
-                    self._log_message("Opening setup to check the Roboflow settings...", "warning")
-                    from config.settings_dialog import SettingsDialog
-                    dialog = SettingsDialog(parent=self, setup_mode=True, setup_type="roboflow")
-                    if dialog.exec() == dialog.DialogCode.Accepted:
-                        QTimer.singleShot(100, lambda: self._check_roboflow(on_complete, retry_count, attempt + 1))
-                    else:
-                        self._log_message("Roboflow setup cancelled... exiting the application...", "error")
-                        app_state.update_connection_status(roboflow=False)
-                        QTimer.singleShot(1000, lambda: QApplication.instance().quit())
-        QTimer.singleShot(1000, try_roboflow)
-
-    def _check_database(self, on_complete, retry_count=3, attempt=0):
-        app_state = ApplicationState.get_instance()
-        app_state.initialize_database(settings_manager)
-        self._log_message("Checking database connection...")
-        def try_db():
-            if app_state.db_connected:
-                self._log_message("Database connection established", "success")
-                app_state.update_connection_status(database=True)
-                QTimer.singleShot(100, lambda: on_complete(True))
-            else:
-                if attempt < retry_count - 1:
-                    self._log_message(f"Database connection failed: Connection failed, retrying... ({attempt + 1}/{retry_count})", "warning")
-                    QTimer.singleShot(1000, lambda: self._check_database(on_complete, retry_count, attempt + 1))
-                else:
-                    self._log_message("Retry failed, check settings again.", "info")
-                    self._log_message("Opening setup to check the database settings...", "warning")
-                    from config.settings_dialog import SettingsDialog
-                    dialog = SettingsDialog(parent=self, setup_mode=True, setup_type="database")
-                    if dialog.exec() == dialog.DialogCode.Accepted:
-                        QTimer.singleShot(100, lambda: self._check_database(on_complete, retry_count, attempt + 1))
-                    else:
-                        self._log_message("Database setup cancelled... exiting the application...", "error")
-                        app_state.update_connection_status(database=False)
-                        QTimer.singleShot(1000, lambda: QApplication.instance().quit())
-        QTimer.singleShot(1000, try_db)
 
     def perform_checks(self, on_complete=None):
         ApplicationState.get_instance()
-        self._check_config(lambda config_ok: self._after_config(config_ok, on_complete))
-
-    def _after_config(self, config_ok, on_complete):
-        self._check_internet(lambda internet_ok: self._after_internet(config_ok, internet_ok, on_complete))
-
-    def _after_internet(self, config_ok, internet_ok, on_complete):
-        self._check_roboflow(lambda roboflow_ok: self._after_roboflow(config_ok, internet_ok, roboflow_ok, on_complete))
-
-    def _after_roboflow(self, config_ok, internet_ok, roboflow_ok, on_complete):
-        self._check_database(lambda database_ok: self._after_database(config_ok, internet_ok, roboflow_ok, database_ok, on_complete))
-
-    def _after_database(self, config_ok, internet_ok, roboflow_ok, database_ok, on_complete):
-        self._log_message("All checks complete, starting application...", "info")
-        QTimer.singleShot(3000, lambda: self._complete_checks(config_ok, internet_ok, roboflow_ok, database_ok, on_complete))
-
-    def _complete_checks(self, config_ok, internet_ok, roboflow_ok, database_ok, on_complete):
-        if on_complete:
-            on_complete(config_ok, internet_ok, roboflow_ok, database_ok)
+        run_checks(
+            log_display=self.log_display,
+            on_complete=on_complete
+        )

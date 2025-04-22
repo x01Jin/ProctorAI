@@ -21,7 +21,7 @@ class SplashLogWriter:
 
     def write(self, text):
         if text.strip():
-            self.splash_screen.log_message(text.strip())
+            self.splash_screen.log(text.strip())
             self.logger.debug(text.strip())
 
     def flush(self):

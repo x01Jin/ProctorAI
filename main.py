@@ -14,13 +14,6 @@ def ensure_directories():
     for directory in directories:
         Path(directory).mkdir(parents=True, exist_ok=True)
 
-def handle_checks_complete(splash, app, config_ok, internet_ok, roboflow_ok, database_ok):
-    if not config_ok or not roboflow_ok or not database_ok:
-        app.quit()
-        return
-    
-    QTimer.singleShot(1000, lambda: start_main_window(splash, app))
-
 def start_main_window(splash, app):
     window = MainWindow()
     window.show()
@@ -42,7 +35,7 @@ def main():
     splash.show()
     
     QTimer.singleShot(1000, lambda: splash.perform_checks(
-        lambda c, i, r, d: handle_checks_complete(splash, app, c, i, r, d)
+        lambda _: QTimer.singleShot(1000, lambda: start_main_window(splash, app))
     ))
     
     sys.exit(app.exec())
