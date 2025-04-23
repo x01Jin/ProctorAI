@@ -1,4 +1,5 @@
 import sys
+import multiprocessing
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
@@ -6,7 +7,7 @@ from frontend.components.main_window import MainWindow
 from frontend.components.splash_screen import SplashScreen
 from backend.utils.log_config import setup_logging
 
-def ensure_directories():
+def initialize_directories():
     directories = [
         "tempcaptures"
     ]
@@ -26,7 +27,7 @@ def log_uncaught_exceptions(exc_type, exc_value, exc_traceback):
 def main():
     setup_logging()
     sys.excepthook = log_uncaught_exceptions
-    ensure_directories()
+    initialize_directories()
     
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
@@ -41,4 +42,5 @@ def main():
     sys.exit(app.exec())
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()

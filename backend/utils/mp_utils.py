@@ -1,5 +1,4 @@
-from multiprocessing import Process, Queue, Event
-from multiprocessing import Value
+from multiprocessing import get_context, Queue, Event, Value
 from queue import Empty, Full
 import cv2
 import logging
@@ -7,11 +6,23 @@ import logging
 camera_logger = logging.getLogger("camera")
 detection_logger = logging.getLogger("detection")
 
-def start_camera_process(frame_queue: Queue, stop_event: Event, camera_index: int) -> Process:
-    return Process(target=_camera_loop, args=(frame_queue, stop_event, camera_index))
+def start_camera_process(frame_queue: Queue, stop_event: Event, camera_index: int):
+    ctx = get_context('spawn')
+    process = ctx.Process(target=_camera_process_entry, args=(frame_queue, stop_event, camera_index))
+    process.daemon = True
+    return process
 
-def start_detection_process(frame_queue: Queue, result_queue: Queue, stop_event: Event, model_config: dict, confidence_value: Value, connection_state: Value) -> Process:
-    return Process(target=_detection_loop, args=(frame_queue, result_queue, stop_event, model_config, confidence_value, connection_state))
+def start_detection_process(frame_queue: Queue, result_queue: Queue, stop_event: Event, model_config: dict, confidence_value: Value, connection_state: Value):
+    ctx = get_context('spawn')
+    process = ctx.Process(target=_detection_process_entry, args=(frame_queue, result_queue, stop_event, model_config, confidence_value, connection_state))
+    process.daemon = True
+    return process
+
+def _camera_process_entry(frame_queue: Queue, stop_event: Event, camera_index: int):
+    _camera_loop(frame_queue, stop_event, camera_index)
+
+def _detection_process_entry(frame_queue: Queue, result_queue: Queue, stop_event: Event, model_config: dict, confidence_value: Value, connection_state: Value):
+    _detection_loop(frame_queue, result_queue, stop_event, model_config, confidence_value, connection_state)
 
 def _camera_loop(frame_queue: Queue, stop_event: Event, camera_index: int):
     cap = cv2.VideoCapture(camera_index)
@@ -54,9 +65,16 @@ def _detection_loop(frame_queue: Queue, result_queue: Queue, stop_event: Event, 
                 connection_state.value = 1
                 continue
 
-def clean_up_process(process: Process, stop_event: Event):
-    if process and process.is_alive():
+def clean_up_process(process, stop_event: Event):
+    if not process:
+        return
+        
+    if process.is_alive():
         stop_event.set()
-        process.join(timeout=1)
+        process.join(timeout=2)
         if process.is_alive():
             process.terminate()
+            process.join(timeout=1)
+            if process.is_alive():
+                process.kill()
+    process.close()
