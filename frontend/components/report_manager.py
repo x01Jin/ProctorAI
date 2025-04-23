@@ -53,6 +53,9 @@ class ReportManagerDock(QDockWidget):
             ImageLabelManager.add_image_label_to_layout(str(file), self.image_layout)
         self.image_container.update()
 
+    def update_image_list(self):
+        self._rebuild_image_layout()
+
     def cleanup(self):
         self.file_watcher.removePath(str(self.temp_dir))
         if self.temp_dir.exists():

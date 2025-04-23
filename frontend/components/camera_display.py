@@ -1,4 +1,7 @@
-from PyQt6.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox
+from PyQt6.QtWidgets import (
+    QDockWidget, QWidget, QVBoxLayout, QHBoxLayout, 
+    QLabel, QComboBox, QSizePolicy, QFrame
+)
 from .buttons import AnimatedStateButton
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QImage
@@ -15,11 +18,18 @@ class CameraDisplayDock(QDockWidget):
         self._init_ui()
 
     def _init_ui(self):
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        root_container = QWidget()
+        root_layout = QVBoxLayout(root_container)
+        root_layout.setContentsMargins(10, 10, 10, 10)
+        root_layout.setSpacing(10)
 
+        self._setup_camera_controls(root_layout)
+        self._setup_display_container(root_layout)
+        
+        self.setWidget(root_container)
+        self._last_size = None
+
+    def _setup_camera_controls(self, parent_layout):
         controls_layout = QHBoxLayout()
         self.camera_combo = QComboBox()
         controls_layout.addWidget(QLabel("Select Camera:"))
@@ -27,29 +37,42 @@ class CameraDisplayDock(QDockWidget):
         self.camera_button = AnimatedStateButton("Start Camera")
         self.camera_button.clicked.connect(lambda: self.camera_toggle_requested.emit())
         controls_layout.addWidget(self.camera_button)
-        layout.addLayout(controls_layout)
+        parent_layout.addLayout(controls_layout)
 
+    def _setup_display_container(self, parent_layout):
+        self.display_container = QFrame()
+        self.display_container.setFrameStyle(QFrame.Shape.NoFrame)
+        self.display_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
+        display_layout = QVBoxLayout(self.display_container)
+        display_layout.setContentsMargins(0, 0, 0, 0)
+        display_layout.setSpacing(0)
+        display_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
         self.display_label = QLabel()
-        self.display_label.setStyleSheet("background-color: black; border: 2px solid #444444;")
-        self.display_label.setMinimumSize(320, 240)
-        layout.addWidget(self.display_label, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        self.setWidget(container)
-        self._last_size = None
+        self.display_label.setStyleSheet("QLabel { background-color: black; border: 2px solid #444444; }")
+        self.display_label.setMinimumSize(640, 360)
+        self.display_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.display_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        display_layout.addWidget(self.display_label, 1)
+        parent_layout.addWidget(self.display_container, 1)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        dock_width = self.width()
-        dock_height = self.height() - self.camera_button.height() - 40
-        target_width = int(dock_width * 0.9)
-        target_height = int((target_width * 3) / 4)
-        if target_height > dock_height * 0.9:
-            target_height = int(dock_height * 0.9)
-            target_width = int((target_height * 4) / 3)
-        new_size = (target_width, target_height)
-        if new_size != self._last_size:
-            self._last_size = new_size
-        self.display_label.setFixedSize(target_width, target_height)
+        available_width = int(self.width() * 0.95)
+        available_height = int((self.height() - self.camera_button.height() - 40) * 0.95)
+        
+        max_width = available_width
+        target_height = int(max_width * 9 / 16)
+        
+        if target_height > available_height:
+            target_height = available_height
+            max_width = int(target_height * 16 / 9)
+            
+        if (max_width, target_height) != self._last_size:
+            self._last_size = (max_width, target_height)
+            self.display_label.setFixedSize(max_width, target_height)
 
     def update_display(self, frame=None, clear_markers=False):
         main_window = self.parent().window()
@@ -58,11 +81,18 @@ class CameraDisplayDock(QDockWidget):
         frame_to_display = self._last_frame
         if frame_to_display is None:
             return
+            
         if clear_markers:
             height, width = frame_to_display.shape[:2]
             bytes_per_line = 3 * width
             q_image = QImage(frame_to_display.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
-            self.display_label.setPixmap(QPixmap.fromImage(q_image))
+            pixmap = QPixmap.fromImage(q_image)
+            scaled_pixmap = pixmap.scaled(
+                self.display_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.display_label.setPixmap(scaled_pixmap)
         else:
             display_frame(frame_to_display, self.display_label, main_window)
 

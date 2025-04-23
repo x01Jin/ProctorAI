@@ -10,9 +10,13 @@ from .status_bar import StatusBarManager
 from .toolbar import ToolbarManager
 from frontend.themes.theme_manager import ThemeManager
 from backend.utils.gui.image_capture_manager import ImageCaptureManager
+import logging
+from backend.utils.thread_utils import start_qt_thread
 from backend.services.application_state import ApplicationState
 from backend.controllers.report_controller import save_pdf
 from .detectwarn import show_detection_pdf_warning
+
+logger = logging.getLogger("reports")
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -97,12 +101,25 @@ class MainWindow(QMainWindow):
         self.detection_manager.toggle_detection()
 
     def _generate_pdf(self):
-        if getattr(self.detection_manager, "detection_active", False):
-            if show_detection_pdf_warning(self):
-                self.detection_manager.toggle_detection(force_stop=True)
+        try:
+            if getattr(self.detection_manager, "detection_active", False):
+                if show_detection_pdf_warning(self):
+                    self.detection_manager.toggle_detection(force_stop=True)
+                    self._run_pdf_generation()
+            else:
+                self._run_pdf_generation()
+        except Exception as e:
+            logger.error(f"Error during PDF generation: {str(e)}")
+
+    def _run_pdf_generation(self):
+        def generate_in_background():
+            try:
                 save_pdf()
-        else:
-            save_pdf()
+                self.report_manager.update_image_list()
+            except Exception as e:
+                logger.error(f"PDF generation failed: {str(e)}")
+
+        self.thread = start_qt_thread(generate_in_background)
 
     def _process_detections(self, detections):
         selected_class = self.get_selected_capture_class()
