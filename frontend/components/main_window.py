@@ -73,13 +73,18 @@ class MainWindow(QMainWindow):
         self.camera_manager.frame_ready.connect(self.camera_display.update_display)
         self.detection_manager.detections_ready.connect(self._process_detections)
         self.detection_manager.detection_stopped.connect(self._on_detection_stopped)
+        self.detection_manager.detection_status_changed.connect(self._on_detection_status_changed)
         self.camera_display.camera_toggle_requested.connect(self._toggle_camera)
         self.detection_controls.detection_toggle_requested.connect(self._toggle_detection)
         self.report_manager.pdf_generation_requested.connect(self._generate_pdf)
+        self.detection_controls.confidence_changed.connect(self.detection_manager.update_confidence_threshold)
 
     def _on_detection_stopped(self):
         self.camera_display.reset_display()
         self.status_bar.update_detections_count(0)
+
+    def _on_detection_status_changed(self, status):
+        self.status_bar.set_detection_status(status)
 
     def _toggle_camera(self):
         self.camera_manager.toggle_camera()
@@ -104,6 +109,9 @@ class MainWindow(QMainWindow):
         if not selected_class:
             return
         self.status_bar.update_detections_count(len(detections))
+        if not detections:
+            self.camera_display.update_display(clear_markers=True)
+            return
         for detection in detections:
             if detection['class'] == selected_class:
                 ImageCaptureManager.capture_image(detection, self.camera_manager.current_image, self)
@@ -137,6 +145,10 @@ class MainWindow(QMainWindow):
         )
 
     def cleanup(self):
+        if hasattr(self, 'detection_manager') and getattr(self.detection_manager, "detection_active", False):
+            self.detection_manager.toggle_detection(force_stop=True)
+        if hasattr(self, 'camera_manager') and getattr(self.camera_manager, "camera_active", False):
+            self.camera_manager.toggle_camera()
         if hasattr(self, 'camera_manager'):
             self.camera_manager.cleanup()
         self.report_manager.cleanup()
