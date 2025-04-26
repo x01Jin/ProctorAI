@@ -1,19 +1,45 @@
-from PyQt6.QtCore import QThread
+from PyQt6.QtCore import QObject, QRunnable, pyqtSignal, QThreadPool
 
-class SimpleThread(QThread):
-    def __init__(self, target, *args):
+class WorkerSignals(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(tuple)
+    result = pyqtSignal(object)
+    progress = pyqtSignal(int)
+
+class Worker(QRunnable):
+    def __init__(self, fn, *args, **kwargs):
         super().__init__()
-        self._target = target
-        self._args = args
-        self._running = True
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
 
     def run(self):
-        self._target(*self._args)
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.signals.error.emit((type(e), e, traceback.format_exc()))
+        else:
+            self.signals.result.emit(result)
+        finally:
+            self.signals.finished.emit()
 
-    def stop(self):
-        self._running = False
+class ThreadPoolManager:
+    _instance = None
 
-def start_qt_thread(target, *args):
-    thread = SimpleThread(target, *args)
-    thread.start()
-    return thread
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(ThreadPoolManager, cls).__new__(cls)
+            cls._instance.pool = QThreadPool()
+            cls._instance.pool.setMaxThreadCount(QThreadPool.globalInstance().maxThreadCount())
+        return cls._instance
+
+    def run(self, fn, *args, **kwargs):
+        worker = Worker(fn, *args, **kwargs)
+        self.pool.start(worker)
+        return worker.signals
+
+    def cleanup(self):
+        self.pool.waitForDone()

@@ -6,6 +6,10 @@ import logging
 camera_logger = logging.getLogger("camera")
 detection_logger = logging.getLogger("detection")
 
+CAM_WIDTH = 1280
+CAM_HEIGHT = 720
+CAM_FRAMES = 30.0
+
 def start_camera_process(frame_queue: Queue, stop_event: Event, camera_index: int):
     ctx = get_context('spawn')
     process = ctx.Process(target=_camera_process_entry, args=(frame_queue, stop_event, camera_index))
@@ -26,10 +30,10 @@ def _detection_process_entry(frame_queue: Queue, result_queue: Queue, stop_event
 
 def _camera_loop(frame_queue: Queue, stop_event: Event, camera_index: int):
     import time
-    frame_interval = 1.0 / 30.0
+    frame_interval = 1.0 / CAM_FRAMES
     cap = cv2.VideoCapture(camera_index)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     last_frame_time = 0
     
     while not stop_event.is_set() and cap.isOpened():

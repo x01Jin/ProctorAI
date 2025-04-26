@@ -2,7 +2,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from pygrabber.dshow_graph import FilterGraph
 import cv2
 import logging
-from backend.utils.thread_utils import start_qt_thread
+from backend.utils.thread_utils import ThreadPoolManager
 from backend.utils.mp_utils import start_camera_process, clean_up_process
 from multiprocessing import Queue, Event
 from queue import Empty
@@ -21,8 +21,7 @@ def frame_update_loop(manager):
         time_since_last = current_time - last_frame_time
         
         if time_since_last < frame_interval:
-            sleep_time = max(1, int((frame_interval - time_since_last) * 1000))
-            manager.thread.msleep(sleep_time)
+            time.sleep(max(0.001, frame_interval - time_since_last))
             continue
             
         try:
@@ -31,7 +30,7 @@ def frame_update_loop(manager):
             manager.frame_ready.emit(frame)
             last_frame_time = time.time()
         except Empty:
-            manager.thread.msleep(10)
+            time.sleep(0.01)
             
     logger.info("Frame update thread stopped")
 
@@ -46,7 +45,7 @@ class CameraManager(QObject):
         self.selected_camera = self.camera_devices[0] if self.camera_devices else ""
         self.main_window.camera_display.camera_combo.currentIndexChanged.connect(self.on_camera_selected)
         self.camera_active = False
-        self.thread = None
+        self.thread_pool_manager = ThreadPoolManager()
         self.camera_process = None
         self.frame_queue = None
         self.stop_event = None
@@ -135,7 +134,7 @@ class CameraManager(QObject):
                 logger.error("Failed to start camera process")
                 return
                 
-            self.thread = start_qt_thread(frame_update_loop, self)
+            self.thread_pool_manager.run(frame_update_loop, self)
             logger.info("Camera process started successfully")
             
         except Exception as e:
@@ -145,16 +144,25 @@ class CameraManager(QObject):
     def _release_resources(self):
         logger.info("Releasing camera resources")
         self.camera_active = False
+        
+        import time
+        time.sleep(0.1)
+        
         if self.camera_process:
             clean_up_process(self.camera_process, self.stop_event)
+            if self.frame_queue:
+                while not self.frame_queue.empty():
+                    try:
+                        self.frame_queue.get_nowait()
+                    except Exception:
+                        break
             self.camera_process = None
             self.stop_event = None
-        if self.thread:
-            self.thread.stop()
-            self.thread.wait()
-            self.thread = None
-        if self.frame_queue:
             self.frame_queue = None
+        
+        if hasattr(self, 'thread_pool_manager'):
+            self.thread_pool_manager.cleanup()
+        
         try:
             if hasattr(self, "main_window") and self.main_window and hasattr(self.main_window, "camera_display"):
                 self.main_window.camera_display.display_label.clear()
