@@ -22,9 +22,11 @@ def validate_settings_dialog_inputs(api_key, project, model_classes, db_host, db
         return False
     return True
 
-def save_settings_dialog(theme_combo, api_key, project, version, model_classes, db_host, db_user, db_pass, db_name, setup_mode, setup_type, settings_updated, parent):
+def save_settings_dialog(theme_combo, api_key, project, version, model_classes, db_host, db_user, db_pass, db_name, setup_mode, setup_type, settings_updated, parent, resolution_combo=None):
     try:
         update_setting("theme", "theme", theme_combo.currentText())
+        if resolution_combo is not None:
+            update_setting("camera", "resolution", resolution_combo.currentText())
         update_setting("roboflow", "api_key", api_key.text().strip())
         update_setting("roboflow", "project", project.text().strip())
         update_setting("roboflow", "model_version", str(version.value()))
@@ -69,6 +71,8 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         theme_group = self._create_theme_group()
         layout.addWidget(theme_group)
+        camera_group = self._create_camera_group()
+        layout.addWidget(camera_group)
         robo_group = self._create_roboflow_group()
         layout.addWidget(robo_group)
         db_group = self._create_database_group()
@@ -90,6 +94,26 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.theme_combo)
         return group
     
+    def _create_camera_group(self):
+        group = QGroupBox("Camera")
+        layout = QFormLayout()
+        layout.setSpacing(8)
+        layout.setContentsMargins(15, 15, 15, 15)
+        self.resolution_combo = QComboBox()
+        standard_resolutions = [
+            "1920x1080", "1280x720", "1024x576", "800x600", "640x480", "320x240"
+        ]
+        self.resolution_combo.addItems(standard_resolutions)
+        from .settings_manager import get_setting
+        current_res = get_setting("camera", "resolution") or "1280x720"
+        if current_res in standard_resolutions:
+            self.resolution_combo.setCurrentText(current_res)
+        else:
+            self.resolution_combo.setCurrentText("1280x720")
+        layout.addRow("Resolution:", self.resolution_combo)
+        group.setLayout(layout)
+        return group
+
     def _create_roboflow_group(self):
         group = QGroupBox("Roboflow")
         layout = QFormLayout()
@@ -170,7 +194,8 @@ class SettingsDialog(QDialog):
         result = save_settings_dialog(
             self.theme_combo, self.api_key, self.project, self.version, self.model_classes,
             self.db_host, self.db_user, self.db_pass, self.db_name,
-            self.setup_mode, self.setup_type, self.settings_updated, self
+            self.setup_mode, self.setup_type, self.settings_updated, self,
+            resolution_combo=getattr(self, "resolution_combo", None)
         )
         if result:
             self.accept()

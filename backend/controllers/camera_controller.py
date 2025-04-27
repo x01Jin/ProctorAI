@@ -1,6 +1,7 @@
 from PyQt6.QtCore import QObject, pyqtSignal
 from pygrabber.dshow_graph import FilterGraph
 import cv2
+import time
 import logging
 from backend.utils.thread_utils import ThreadPoolManager
 from backend.utils.mp_utils import start_camera_process, clean_up_process
@@ -36,6 +37,7 @@ def frame_update_loop(manager):
 
 class CameraManager(QObject):
     frame_ready = pyqtSignal(object)
+    camera_start_failed = pyqtSignal(str)
 
     def __init__(self, main_window):
         super().__init__()
@@ -59,6 +61,30 @@ class CameraManager(QObject):
                 cap.release()
                 logger.info(f"Found camera at index {i}")
         return devices
+    
+    def _query_supported_resolutions(self, camera_index):
+        standard_resolutions = [
+            (1920, 1080),
+            (1280, 720),
+            (1024, 576),
+            (800, 600),
+            (640, 480),
+            (320, 240)
+        ]
+        supported = []
+        cap = cv2.VideoCapture(camera_index)
+        if not cap.isOpened():
+            return supported
+        for width, height in standard_resolutions:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            time.sleep(0.05)
+            actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            if abs(actual_width - width) <= 16 and abs(actual_height - height) <= 16:
+                supported.append((actual_width, actual_height))
+        cap.release()
+        return supported
 
     def list_cameras(self):
         try:
@@ -126,12 +152,19 @@ class CameraManager(QObject):
             self.frame_queue = Queue(maxsize=optimal_queue_size)
             self.stop_event = Event()
             
-            self.camera_process = start_camera_process(self.frame_queue, self.stop_event, camera_index)
+            from config.settings_manager import get_setting
+            resolution_str = get_setting("camera", "resolution") or "1280x720"
+            try:
+                width, height = map(int, resolution_str.lower().split("x"))
+            except Exception:
+                width, height = 1280, 720
+            self.camera_process = start_camera_process(self.frame_queue, self.stop_event, camera_index, width, height)
             self.camera_process.start()
             
             if not self._verify_camera_started():
                 self._release_resources()
                 logger.error("Failed to start camera process")
+                self.camera_start_failed.emit("Failed to start camera. Please check your camera connection and try again.")
                 return
                 
             self.thread_pool_manager.run(frame_update_loop, self)

@@ -10,9 +10,9 @@ CAM_WIDTH = 1280
 CAM_HEIGHT = 720
 CAM_FRAMES = 30.0
 
-def start_camera_process(frame_queue: Queue, stop_event: Event, camera_index: int):
+def start_camera_process(frame_queue: Queue, stop_event: Event, camera_index: int, width: int, height: int):
     ctx = get_context('spawn')
-    process = ctx.Process(target=_camera_process_entry, args=(frame_queue, stop_event, camera_index))
+    process = ctx.Process(target=_camera_process_entry, args=(frame_queue, stop_event, camera_index, width, height))
     process.daemon = True
     return process
 
@@ -22,18 +22,18 @@ def start_detection_process(frame_queue: Queue, result_queue: Queue, stop_event:
     process.daemon = True
     return process
 
-def _camera_process_entry(frame_queue: Queue, stop_event: Event, camera_index: int):
-    _camera_loop(frame_queue, stop_event, camera_index)
+def _camera_process_entry(frame_queue: Queue, stop_event: Event, camera_index: int, width: int, height: int):
+    _camera_loop(frame_queue, stop_event, camera_index, width, height)
 
 def _detection_process_entry(frame_queue: Queue, result_queue: Queue, stop_event: Event, model_config: dict, confidence_value: Value, connection_state: Value):
     _detection_loop(frame_queue, result_queue, stop_event, model_config, confidence_value, connection_state)
 
-def _camera_loop(frame_queue: Queue, stop_event: Event, camera_index: int):
+def _camera_loop(frame_queue: Queue, stop_event: Event, camera_index: int, width: int, height: int):
     import time
     frame_interval = 1.0 / CAM_FRAMES
     cap = cv2.VideoCapture(camera_index)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
     last_frame_time = 0
     
     while not stop_event.is_set() and cap.isOpened():
