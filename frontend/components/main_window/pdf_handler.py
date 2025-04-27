@@ -1,11 +1,9 @@
 from PyQt6.QtWidgets import QMessageBox
-from backend.utils.log_config import setup_logging
 import logging
 from backend.controllers.report_controller import get_report_details, save_pdf_with_details
 from ..detectwarn import show_detection_pdf_warning
 from frontend.components.loading_dialog import LoadingDialog
 
-setup_logging()
 logger = logging.getLogger("report")
 
 def generate_pdf(window):

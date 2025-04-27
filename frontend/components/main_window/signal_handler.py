@@ -2,9 +2,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QThread
 import logging
 from frontend.components.loading_dialog import LoadingDialog
-from backend.utils.log_config import setup_logging
 
-setup_logging()
 logger = logging.getLogger("detection")
 
 def connect_signals(window):

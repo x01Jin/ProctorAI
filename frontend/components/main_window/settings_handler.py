@@ -1,9 +1,7 @@
 from PyQt6.QtWidgets import QMessageBox
-from backend.utils.log_config import setup_logging
 from frontend.components.loading_dialog import LoadingDialog
 import logging
 
-setup_logging()
 rlogger = logging.getLogger("report")
 clogger = logging.getLogger("camera")
 dlogger = logging.getLogger("detection")

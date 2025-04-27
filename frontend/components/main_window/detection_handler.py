@@ -1,9 +1,7 @@
-from backend.utils.log_config import setup_logging
 import logging
 from backend.utils.gui.image_capture_manager import ImageCaptureManager
 from frontend.components.loading_dialog import LoadingDialog
 
-setup_logging()
 logger = logging.getLogger("detection")
 
 def process_detections(window, detections):
