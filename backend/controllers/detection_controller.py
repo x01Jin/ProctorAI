@@ -136,7 +136,6 @@ class DetectionManager(QObject):
     def update_confidence_threshold(self, new_value):
         if hasattr(self, 'confidence_value') and self.confidence_value:
             self.confidence_value.value = new_value
-            logger.debug(f"Confidence threshold updated to: {new_value}")
 
     def _result_update_loop(self):
         logger.info("Detection update thread starting")

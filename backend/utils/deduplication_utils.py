@@ -1,8 +1,8 @@
 import time
 import logging
 
-DEADZONE_SIZE = 60
-DEADZONE_DURATION = 180
+DEADZONE_SIZE = 100
+DEADZONE_DURATION = 300
 
 class DetectionDeduplicator:
     _deadzones = []
