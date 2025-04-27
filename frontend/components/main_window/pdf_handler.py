@@ -1,16 +1,21 @@
 from PyQt6.QtWidgets import QMessageBox
+from backend.utils.log_config import setup_logging
 import logging
 from backend.controllers.report_controller import get_report_details, save_pdf_with_details
 from ..detectwarn import show_detection_pdf_warning
+from frontend.components.loading_dialog import LoadingDialog
 
-logger = logging.getLogger("reports")
+setup_logging()
+logger = logging.getLogger("report")
 
 def generate_pdf(window):
     try:
         if getattr(window.detection_manager, "detection_active", False):
             if not show_detection_pdf_warning(window):
                 return
-            window.detection_manager.toggle_detection(force_stop=True)
+            def toggle_task():
+                window.detection_manager.toggle_detection(force_stop=True)
+            LoadingDialog.show_loading(window, "Toggling detection...", toggle_task, logger_name="report")
         details = get_report_details()
         if not details:
             return
