@@ -1,7 +1,10 @@
+from backend.utils.log_config import setup_logging
 import logging
 from backend.utils.gui.image_capture_manager import ImageCaptureManager
+from frontend.components.loading_dialog import LoadingDialog
 
-logger = logging.getLogger("reports")
+setup_logging()
+logger = logging.getLogger("detection")
 
 def process_detections(window, detections):
     selected_class = window.get_selected_capture_class()
@@ -24,7 +27,9 @@ def process_detections(window, detections):
             ImageCaptureManager.capture_image(detection, current_image, window)
 
 def handle_detection_toggle(window):
-    window.detection_manager.toggle_detection()
+    def toggle_task():
+        window.detection_manager.toggle_detection()
+    LoadingDialog.show_loading(window, "Toggling detection...", toggle_task)
 
 def get_selected_capture_class(window):
     return window.detection_controls.get_selected_capture_class()

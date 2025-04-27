@@ -1,7 +1,11 @@
 from PyQt6.QtWidgets import QMessageBox
+from backend.utils.log_config import setup_logging
 import logging
 
-logger = logging.getLogger("reports")
+setup_logging()
+rlogger = logging.getLogger("report")
+clogger = logging.getLogger("camera")
+dlogger = logging.getLogger("detection")
 
 def handle_settings_update(window):
     if hasattr(window, "detection_manager") and window.detection_manager:
@@ -27,25 +31,21 @@ def setup_model(window):
     return setup_model_components(window)
 
 def cleanup_resources(window):
-    logger.info("Starting MainWindow cleanup...")
-    
-    if hasattr(window, "detection_manager") and window.detection_manager:
-        logger.info("Cleaning up DetectionManager...")
-        window.detection_manager.cleanup()
-    
-    if hasattr(window, "camera_manager") and window.camera_manager:
-        if getattr(window.camera_manager, "camera_active", False):
-            logger.info("Stopping camera...")
-            window.camera_manager.toggle_camera()
-        logger.info("Cleaning up CameraManager...")
-        window.camera_manager.cleanup()
-    
+    camera_active = hasattr(window, "camera_manager") and window.camera_manager and getattr(window.camera_manager, "camera_active", False)
+    if camera_active and hasattr(window, "_toggle_camera"):
+        clogger.info("Simulating camera button toggle for cleanup...")
+        window._toggle_camera()
+    else:
+        if hasattr(window, "detection_manager") and window.detection_manager:
+            dlogger.info("Cleaning up DetectionManager...")
+            window.detection_manager.cleanup()
+        if hasattr(window, "camera_manager") and window.camera_manager:
+            clogger.info("Cleaning up CameraManager...")
+            window.camera_manager.cleanup()
+
     if hasattr(window, "report_manager"):
-        logger.info("Cleaning up ReportManager...")
+        rlogger.info("Cleaning up ReportManager...")
         window.report_manager.cleanup()
-    
+
     if hasattr(window, "thread_pool_manager"):
-        logger.info("Cleaning up ThreadPoolManager...")
         window.thread_pool_manager.cleanup()
-    
-    logger.info("MainWindow cleanup finished.")

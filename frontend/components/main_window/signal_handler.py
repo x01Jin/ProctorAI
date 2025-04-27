@@ -1,8 +1,11 @@
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QThread
 import logging
+from frontend.components.loading_dialog import LoadingDialog
+from backend.utils.log_config import setup_logging
 
-logger = logging.getLogger("reports")
+setup_logging()
+logger = logging.getLogger("detection")
 
 def connect_signals(window):
     window.camera_manager.frame_ready.connect(window.camera_display.update_display)
@@ -34,13 +37,14 @@ def handle_detection_status_change(window, status):
     window.status_bar.set_detection_status(status)
 
 def handle_camera_toggle(window):
-    if getattr(window.camera_manager, "camera_active", True):
-        if getattr(window.detection_manager, "detection_active", False):
-            window.detection_manager.toggle_detection(force_stop=True)
-            while getattr(window.detection_manager, "detection_active", True):
-                QApplication.processEvents()
-                QThread.msleep(50)
-
-    window.camera_manager.toggle_camera()
-    camera_active = getattr(window.camera_manager, "camera_active", False)
-    window.detection_controls.set_detection_enabled(camera_active)
+    def toggle_task():
+        if getattr(window.camera_manager, "camera_active", True):
+            if getattr(window.detection_manager, "detection_active", False):
+                window.detection_manager.toggle_detection(force_stop=True)
+                while getattr(window.detection_manager, "detection_active", True):
+                    QApplication.processEvents()
+                    QThread.msleep(50)
+        window.camera_manager.toggle_camera()
+        camera_active = getattr(window.camera_manager, "camera_active", False)
+        window.detection_controls.set_detection_enabled(camera_active)
+    LoadingDialog.show_loading(window, "Toggling camera...", toggle_task, logger_name="camera")
