@@ -25,7 +25,7 @@ def generate_pdf(window):
             window.report_manager.update_image_list()
         def on_result(success):
             if success:
-                QMessageBox.information(window, "PDF Saved", "PDF report saved successfully.")
+                QMessageBox.information(window, "PDF Saved", "PDF report saved successfully in 'Desktop/ProctorAI-Report' Directory.")
             else:
                 QMessageBox.critical(window, "PDF Error", "Failed to save PDF report.")
         def on_error(error_info):

@@ -45,3 +45,17 @@ class FieldValidator:
         if room < 1 or room > 99:
             return ValidationResult(False, "Room number must be between 01-99")
         return ValidationResult(True)
+
+    @staticmethod
+    def validate_time_range(start_time: str, end_time: str) -> ValidationResult:
+        def to_minutes(t):
+            h, m = map(int, t.split(":"))
+            return h * 60 + m
+        start = to_minutes(start_time)
+        end = to_minutes(end_time)
+        if end <= start:
+            return ValidationResult(False, "End time must be after start time.")
+        duration = end - start
+        if duration >= 300:
+            return ValidationResult(False, "Time range must be less than 5 hours.")
+        return ValidationResult(True)

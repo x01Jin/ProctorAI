@@ -52,6 +52,14 @@ class ReportDialog(QDialog):
             self.builder.show_error(room_result.error)
             return
 
+        time_result = validator.validate_time_range(
+            w['start_time'].get_time_24h(),
+            w['end_time'].get_time_24h()
+        )
+        if not time_result:
+            self.builder.show_error(time_result.error)
+            return
+
         self.details = DetailsCollector.collect_details(self.widgets)
         self.accept()
 
