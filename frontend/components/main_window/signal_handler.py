@@ -3,7 +3,8 @@ from PyQt6.QtCore import QThread
 import logging
 from frontend.components.loading_dialog import LoadingDialog
 
-logger = logging.getLogger("detection")
+dlogger = logging.getLogger("detection")
+clogger = logging.getLogger("camera")
 
 def connect_signals(window):
     window.camera_manager.frame_ready.connect(window.camera_display.update_display)
@@ -12,6 +13,7 @@ def connect_signals(window):
     window.detection_manager.detection_status_changed.connect(window._on_detection_status_changed)
     window.detection_manager.detection_started.connect(window._on_detection_started)
     window.detection_manager.detection_start_failed.connect(window._on_detection_start_failed)
+    window.camera_manager.camera_start_failed.connect(lambda msg: handle_camera_start_failure(window, msg))
     window.camera_display.camera_toggle_requested.connect(window._toggle_camera)
     window.detection_controls.detection_toggle_requested.connect(window._toggle_detection)
     window.report_manager.pdf_generation_requested.connect(window._generate_pdf)
@@ -20,16 +22,20 @@ def connect_signals(window):
     )
 
 def handle_detection_start(window):
-    logger.info("Detection successfully started from MainWindow.")
+    dlogger.info("Detection successfully started from MainWindow.")
 
 def handle_detection_start_failure(window, error_message):
     QMessageBox.warning(window, "Detection Error", f"Could not start detection: {error_message}")
-    logger.error(f"Detection start failed: {error_message}")
+    dlogger.error(f"Detection start failed: {error_message}")
 
 def handle_detection_stop(window):
     window.camera_display.reset_display()
     window.status_bar.update_detections_count(0)
-    logger.info("Detection stopped signal received in MainWindow.")
+    dlogger.info("Detection stopped signal received in MainWindow.")
+
+def handle_camera_start_failure(window, error_message):
+    QMessageBox.critical(window, "Camera Error", error_message)
+    clogger.error(f"Camera start failed: {error_message}")
 
 def handle_detection_status_change(window, status):
     window.status_bar.set_detection_status(status)

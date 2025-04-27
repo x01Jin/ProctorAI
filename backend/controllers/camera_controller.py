@@ -36,6 +36,7 @@ def frame_update_loop(manager):
 
 class CameraManager(QObject):
     frame_ready = pyqtSignal(object)
+    camera_start_failed = pyqtSignal(str)
 
     def __init__(self, main_window):
         super().__init__()
@@ -132,6 +133,7 @@ class CameraManager(QObject):
             if not self._verify_camera_started():
                 self._release_resources()
                 logger.error("Failed to start camera process")
+                self.camera_start_failed.emit("Failed to start camera process. Please check your camera connection and try again.")
                 return
                 
             self.thread_pool_manager.run(frame_update_loop, self)
