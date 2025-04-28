@@ -2,6 +2,7 @@ from multiprocessing import get_context, Queue, Event, Value
 from queue import Empty, Full
 import cv2
 import logging
+import time
 
 camera_logger = logging.getLogger("camera")
 detection_logger = logging.getLogger("detection")
@@ -10,9 +11,9 @@ CAM_WIDTH = 1280
 CAM_HEIGHT = 720
 CAM_FRAMES = 30.0
 
-def start_camera_process(frame_queue: Queue, stop_event: Event, camera_index: int):
+def start_camera_process(frame_queue: Queue, stop_event: Event, camera_index: int, backend: str = "auto"):
     ctx = get_context('spawn')
-    process = ctx.Process(target=_camera_process_entry, args=(frame_queue, stop_event, camera_index))
+    process = ctx.Process(target=_camera_process_entry, args=(frame_queue, stop_event, camera_index, backend))
     process.daemon = True
     return process
 
@@ -22,16 +23,24 @@ def start_detection_process(frame_queue: Queue, result_queue: Queue, stop_event:
     process.daemon = True
     return process
 
-def _camera_process_entry(frame_queue: Queue, stop_event: Event, camera_index: int):
-    _camera_loop(frame_queue, stop_event, camera_index)
+def _camera_process_entry(frame_queue: Queue, stop_event: Event, camera_index: int, backend: str = "auto"):
+    _camera_loop(frame_queue, stop_event, camera_index, backend)
 
 def _detection_process_entry(frame_queue: Queue, result_queue: Queue, stop_event: Event, model_config: dict, confidence_value: Value, connection_state: Value):
     _detection_loop(frame_queue, result_queue, stop_event, model_config, confidence_value, connection_state)
 
-def _camera_loop(frame_queue: Queue, stop_event: Event, camera_index: int):
-    import time
+def _camera_loop(frame_queue: Queue, stop_event: Event, camera_index: int, backend: str = "auto"):
     frame_interval = 1.0 / CAM_FRAMES
-    cap = cv2.VideoCapture(camera_index)
+    backend_map = {
+        "auto": None,
+        "dshow": cv2.CAP_DSHOW,
+        "msmf": cv2.CAP_MSMF
+    }
+    backend_flag = backend_map.get(backend, None)
+    if backend_flag is not None:
+        cap = cv2.VideoCapture(camera_index, backend_flag)
+    else:
+        cap = cv2.VideoCapture(camera_index)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     last_frame_time = 0

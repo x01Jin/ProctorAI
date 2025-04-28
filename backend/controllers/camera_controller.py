@@ -6,24 +6,31 @@ from backend.utils.thread_utils import ThreadPoolManager
 from backend.utils.mp_utils import start_camera_process, clean_up_process
 from multiprocessing import Queue, Event
 from queue import Empty
-
+from config.settings_manager import get_setting
+ 
 CAMERA_SLEEP_MS = 16
 logger = logging.getLogger("camera")
 
+CAMERA_BACKEND_MAP = {
+    "auto": None,
+    "dshow": cv2.CAP_DSHOW,
+    "msmf": cv2.CAP_MSMF
+}
+ 
 def frame_update_loop(manager):
     import time
     frame_interval = 1.0 / 60.0
     last_frame_time = 0
     logger.info("Frame update thread starting")
-    
+     
     while manager.camera_active:
         current_time = time.time()
         time_since_last = current_time - last_frame_time
-        
+         
         if time_since_last < frame_interval:
             time.sleep(max(0.001, frame_interval - time_since_last))
             continue
-            
+             
         try:
             frame = manager.frame_queue.get(timeout=0.1)
             manager.current_image = frame
@@ -31,13 +38,13 @@ def frame_update_loop(manager):
             last_frame_time = time.time()
         except Empty:
             time.sleep(0.01)
-            
+             
     logger.info("Frame update thread stopped")
-
+ 
 class CameraManager(QObject):
     frame_ready = pyqtSignal(object)
     camera_start_failed = pyqtSignal(str)
-
+ 
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
@@ -50,15 +57,27 @@ class CameraManager(QObject):
         self.camera_process = None
         self.frame_queue = None
         self.stop_event = None
+        self.camera_backend = self._get_camera_backend()
+
+    def _get_camera_backend(self):
+        backend = get_setting("camera", "backend")
+        if backend not in CAMERA_BACKEND_MAP:
+            backend = "auto"
+        return backend
 
     def _get_opencv_devices(self):
         devices = []
+        backend = self._get_camera_backend()
+        backend_flag = CAMERA_BACKEND_MAP[backend]
         for i in range(5):
-            cap = cv2.VideoCapture(i)
+            if backend_flag is not None:
+                cap = cv2.VideoCapture(i, backend_flag)
+            else:
+                cap = cv2.VideoCapture(i)
             if cap.isOpened():
                 devices.append(f"Camera {i}")
                 cap.release()
-                logger.info(f"Found camera at index {i}")
+                logger.info(f"Found camera at index {i} with backend {backend}")
         return devices
 
     def list_cameras(self):
@@ -115,30 +134,24 @@ class CameraManager(QObject):
             if self.selected_camera == "No cameras found":
                 logger.error("Cannot start camera - no cameras available")
                 return
-                
             if self.selected_camera.startswith("Camera "):
                 camera_index = int(self.selected_camera.split(" ")[1])
             else:
                 camera_index = self.camera_devices.index(self.selected_camera)
-                
-            logger.info(f"Initializing camera: {self.selected_camera} (index: {camera_index})")
-            
+            backend = self._get_camera_backend()
+            logger.info(f"Initializing camera: {self.selected_camera} (index: {camera_index}) with backend {backend}")
             optimal_queue_size = 10
             self.frame_queue = Queue(maxsize=optimal_queue_size)
             self.stop_event = Event()
-            
-            self.camera_process = start_camera_process(self.frame_queue, self.stop_event, camera_index)
+            self.camera_process = start_camera_process(self.frame_queue, self.stop_event, camera_index, backend)
             self.camera_process.start()
-            
             if not self._verify_camera_started():
                 self._release_resources()
                 logger.error("Failed to start camera process")
                 self.camera_start_failed.emit("Failed to start camera process. Please check your camera connection and try again.")
                 return
-                
             self.thread_pool_manager.run(frame_update_loop, self)
             logger.info("Camera process started successfully")
-            
         except Exception as e:
             logger.error(f"Error initializing camera: {str(e)}")
             self._release_resources()
