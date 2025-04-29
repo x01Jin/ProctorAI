@@ -38,6 +38,13 @@ class ToolbarManager(QObject):
         self.parent.report_manager.setVisible(not self.parent.report_manager.isVisible())
 
     def _show_settings(self):
+        camera_active = False
+        if hasattr(self.parent, "camera_manager"):
+            camera_active = getattr(self.parent.camera_manager, "camera_active", False)
+        if camera_active:
+            from frontend.components.detectwarn import show_settings_interrupt_warning
+            if not show_settings_interrupt_warning(self.parent):
+                return
         if self.settings_dialog.exec() == SettingsDialog.DialogCode.Accepted:
             theme = settings_manager.get_setting("theme", "theme")
             self.parent.theme_manager.apply_theme(theme)
