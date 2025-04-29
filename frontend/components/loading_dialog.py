@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QScrollArea, QWidget
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject, QTimer
 from frontend.themes.theme_manager import ThemeManager
 import logging
@@ -21,25 +21,35 @@ class Worker(QObject):
             self.error.emit(e)
 
 class LoadingDialog(QDialog):
-    def __init__(self, parent, message, logger_name="detection"):
+    _instance = None
+
+    def __init__(self, parent=None, logger_name="detection"):
         super().__init__(parent)
         self.logger = logging.getLogger(logger_name)
         self.root_logger = logging.getLogger()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setModal(True)
         self.setObjectName("LoadingDialog")
-        self.layout = QVBoxLayout(self)
-        self.label = QLabel(message, self)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.progress = QProgressBar(self)
-        self.progress.setRange(0, 0)
-        self.layout.addWidget(self.label)
-        self.layout.addWidget(self.progress)
         self.theme_manager = ThemeManager.instance()
         self.theme_manager.theme_changed.connect(self.apply_theme)
+        self.layout = QVBoxLayout(self)
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_content = QWidget()
+        self.scroll_layout = QVBoxLayout(self.scroll_content)
+        self.scroll_content.setLayout(self.scroll_layout)
+        self.scroll_area.setWidget(self.scroll_content)
+        self.layout.addWidget(self.scroll_area)
+        self.tasks = {}
         self.apply_theme()
-        self.logger.info("LoadingDialog initialized with message: '%s'", message)
-        self.root_logger.info("LoadingDialog initialized with message: '%s'", message)
+        self.logger.info("LoadingDialog initialized (multi-task)")
+        self.root_logger.info("LoadingDialog initialized (multi-task)")
+
+    @classmethod
+    def instance(cls, parent=None, logger_name="detection"):
+        if cls._instance is None or not cls._instance.isVisible():
+            cls._instance = LoadingDialog(parent, logger_name)
+        return cls._instance
 
     def apply_theme(self):
         palette = self.theme_manager.current_palette()
@@ -47,15 +57,25 @@ class LoadingDialog(QDialog):
             f"background-color: {palette['background']};"
             f"color: {palette['text']};"
         )
-        self.label.setStyleSheet(
-            f"color: {palette['text']};"
-        )
+        for task in self.tasks.values():
+            task["label"].setStyleSheet(f"color: {palette['text']};")
 
-    @staticmethod
-    def show_loading(parent, message, task_fn, on_done=None, logger_name="detection", *args, **kwargs):
+    def add_task(self, message, task_fn, on_done=None, logger_name="detection", *args, **kwargs):
         logger = logging.getLogger(logger_name)
         root_logger = logging.getLogger()
-        dialog = LoadingDialog(parent, message, logger_name)
+        task_id = id(task_fn) + len(self.tasks)
+        task_widget = QWidget()
+        task_layout = QVBoxLayout(task_widget)
+        label = QLabel(message, self)
+        label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        progress = QProgressBar(self)
+        progress.setRange(0, 0)
+        status_label = QLabel("Running...", self)
+        status_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        task_layout.addWidget(label)
+        task_layout.addWidget(progress)
+        task_layout.addWidget(status_label)
+        self.scroll_layout.addWidget(task_widget)
         thread = QThread()
         worker = Worker(task_fn, *args, **kwargs)
         worker.moveToThread(thread)
@@ -71,11 +91,14 @@ class LoadingDialog(QDialog):
                 logger.debug("Waiting for thread to finish...")
                 root_logger.debug("Waiting for thread to finish...")
                 thread.wait()
-            dialog.accept()
-            logger.info("LoadingDialog closed.")
-            root_logger.info("LoadingDialog closed.")
+            progress.setRange(0, 1)
+            progress.setValue(1)
+            status_label.setText("Done")
+            logger.info("Task finished: %s", message)
+            root_logger.info("Task finished: %s", message)
             if on_done:
                 on_done()
+            self._check_all_tasks_done()
 
         def on_thread_started():
             logger.debug("Worker thread started (id=%s)", int(thread.currentThreadId()))
@@ -88,6 +111,10 @@ class LoadingDialog(QDialog):
         def on_worker_error(e):
             logger.error("Worker error: %s", str(e))
             root_logger.error("Worker error: %s", str(e))
+            status_label.setText("Error")
+            progress.setRange(0, 1)
+            progress.setValue(0)
+            self._check_all_tasks_done()
 
         worker.finished.connect(cleanup)
         worker.error.connect(lambda e: (on_worker_error(e), cleanup()))
@@ -95,6 +122,32 @@ class LoadingDialog(QDialog):
         thread.started.connect(worker.run)
         thread.finished.connect(lambda: (logger.debug("Worker thread finished."), root_logger.debug("Worker thread finished.")))
         thread.start()
-        logger.info("LoadingDialog shown: message='%s'", message)
-        root_logger.info("LoadingDialog shown: message='%s'", message)
+        logger.info("LoadingDialog task started: message='%s'", message)
+        root_logger.info("LoadingDialog task started: message='%s'", message)
+        self.tasks[task_id] = {
+            "thread": thread,
+            "worker": worker,
+            "label": label,
+            "progress": progress,
+            "status_label": status_label,
+            "widget": task_widget,
+        }
+        self.apply_theme()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _check_all_tasks_done(self):
+        all_done = all(
+            t["status_label"].text() in ("Done", "Error") for t in self.tasks.values()
+        )
+        if all_done:
+            self.logger.info("All tasks finished. Dialog will close automatically.")
+            self.root_logger.info("All tasks finished. Dialog will close automatically.")
+            QTimer.singleShot(300, self.accept)
+
+    @staticmethod
+    def show_loading(parent, message, task_fn, on_done=None, logger_name="detection", *args, **kwargs):
+        dialog = LoadingDialog.instance(parent, logger_name)
+        dialog.add_task(message, task_fn, on_done, logger_name, *args, **kwargs)
         dialog.exec()

@@ -36,7 +36,8 @@ class ThemeManager(QObject):
     def apply_dark_theme(self):
         palette = {
             "background": "#353535",
-            "text": "#ffffff"
+            "text": "#ffffff",
+            "button_disabled_text": "#888888"
         }
         self._palette = palette
         if self.parent:
@@ -57,7 +58,8 @@ class ThemeManager(QObject):
     def apply_light_theme(self):
         palette = {
             "background": "#ffffff",
-            "text": "#000000"
+            "text": "#000000",
+            "button_disabled_text": "#b0b0b0"
         }
         self._palette = palette
         if self.parent:
@@ -79,4 +81,8 @@ class ThemeManager(QObject):
         return self.current_theme
 
     def current_palette(self):
-        return self._palette if self._palette else {"background": "#353535", "text": "#ffffff"}
+        return self._palette if self._palette else {"background": "#353535", "text": "#ffffff", "button_disabled_text": "#888888"}
+
+    def button_disabled_text_color(self):
+        palette = self.current_palette()
+        return palette.get("button_disabled_text", "#888888")

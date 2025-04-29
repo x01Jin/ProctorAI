@@ -8,9 +8,10 @@ dlogger = logging.getLogger("detection")
 
 def handle_settings_update(window):
     def do_update():
-        if hasattr(window, "detection_manager") and window.detection_manager:
-            window.detection_manager.toggle_detection(force_stop=True)
-        if hasattr(window, "camera_manager") and window.camera_manager and getattr(window.camera_manager, "camera_active", False):
+        camera_active = hasattr(window, "camera_manager") and window.camera_manager and getattr(window.camera_manager, "camera_active", False)
+        if camera_active:
+            if hasattr(window, "detection_manager") and getattr(window.detection_manager, "detection_active", False):
+                window.detection_manager.toggle_detection(force_stop=True)
             window.camera_manager.stop_camera()
         roboflow_ok = window.app_state.reinitialize_roboflow()
         window._settings_update_result = {"roboflow_ok": roboflow_ok}
@@ -49,9 +50,12 @@ def setup_model(window):
 
 def cleanup_resources(window):
     camera_active = hasattr(window, "camera_manager") and window.camera_manager and getattr(window.camera_manager, "camera_active", False)
-    if camera_active and hasattr(window, "_toggle_camera"):
-        clogger.info("Simulating camera button toggle for cleanup...")
-        window._toggle_camera()
+    if camera_active:
+        clogger.info("Stopping camera for cleanup...")
+        if hasattr(window, "detection_manager") and getattr(window.detection_manager, "detection_active", False):
+            dlogger.info("Stopping detection first...")
+            window.detection_manager.toggle_detection(force_stop=True)
+        window.camera_manager.stop_camera()
     else:
         if hasattr(window, "detection_manager") and window.detection_manager:
             dlogger.info("Cleaning up DetectionManager...")

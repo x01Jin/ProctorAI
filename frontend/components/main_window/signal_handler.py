@@ -14,8 +14,8 @@ def connect_signals(window):
     window.detection_manager.detection_started.connect(window._on_detection_started)
     window.detection_manager.detection_start_failed.connect(window._on_detection_start_failed)
     window.camera_manager.camera_start_failed.connect(lambda msg: handle_camera_start_failure(window, msg))
-    window.camera_manager.camera_started.connect(lambda: window.camera_display.update_camera_button_text(True))
-    window.camera_manager.camera_stopped.connect(lambda: window.camera_display.update_camera_button_text(False))
+    window.camera_manager.camera_started.connect(lambda: handle_camera_started(window))
+    window.camera_manager.camera_stopped.connect(lambda: handle_camera_stopped(window))
     window.camera_display.camera_toggle_requested.connect(window._toggle_camera)
     window.detection_controls.detection_toggle_requested.connect(window._toggle_detection)
     window.report_manager.pdf_generation_requested.connect(window._generate_pdf)
@@ -35,9 +35,20 @@ def handle_detection_stop(window):
     window.status_bar.update_detections_count(0)
     dlogger.info("Detection stopped signal received in MainWindow.")
 
+def handle_camera_started(window):
+    window.camera_display.update_camera_button_text(True)
+    window.detection_controls.set_detection_enabled(True)
+    clogger.info("Camera started successfully")
+
+def handle_camera_stopped(window):
+    window.camera_display.update_camera_button_text(False)
+    window.detection_controls.set_detection_enabled(False)
+    clogger.info("Camera stopped")
+
 def handle_camera_start_failure(window, error_message):
     QMessageBox.critical(window, "Camera Error", error_message)
     clogger.error(f"Camera start failed: {error_message}")
+    window.detection_controls.set_detection_enabled(False)
 
 def handle_detection_status_change(window, status):
     window.status_bar.set_detection_status(status)

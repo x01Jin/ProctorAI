@@ -43,6 +43,7 @@ class DetectionControlsDock(QDockWidget):
         self.detection_button = AnimatedStateButton("Start Detection")
         self.detection_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.detection_button.clicked.connect(lambda: self.detection_toggle_requested.emit())
+        self.detection_button.setEnabled(False)
         layout.addWidget(self.detection_button)
 
         self.confidence_label = QLabel("10%")

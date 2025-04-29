@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, pyqtProperty
+from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, pyqtProperty, Qt
 from PyQt6.QtGui import QPainter, QColor, QPen, QPainterPath, QConicalGradient
+from frontend.themes.theme_manager import ThemeManager
 
 class AnimatedStateButton(QPushButton):
     def __init__(self, *args, **kwargs):
@@ -17,7 +18,6 @@ class AnimatedStateButton(QPushButton):
         self._active_gradient_colors = [QColor("#2ecc71"), QColor("#ffffff")]
         self._inactive_color = QColor("#e74c3c")
         self.setAutoFillBackground(True)
-        self.setStyleSheet("QPushButton:disabled { color: #bbbbbb; }")
 
     @pyqtProperty(float)
     def rotation_angle(self):
@@ -67,3 +67,16 @@ class AnimatedStateButton(QPushButton):
             pen.setWidth(self._border_width)
             painter.setPen(pen)
             painter.drawPath(border_path)
+
+        text_rect = self.rect()
+        if not self.isEnabled():
+            theme_manager = ThemeManager.instance()
+            text_color = QColor(theme_manager.button_disabled_text_color())
+        else:
+            text_color = self.palette().buttonText().color()
+        painter.setPen(QPen(text_color))
+        painter.drawText(
+            text_rect,
+            int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter),
+            self.text()
+        )
