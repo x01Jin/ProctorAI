@@ -14,6 +14,8 @@ def connect_signals(window):
     window.detection_manager.detection_started.connect(window._on_detection_started)
     window.detection_manager.detection_start_failed.connect(window._on_detection_start_failed)
     window.camera_manager.camera_start_failed.connect(lambda msg: handle_camera_start_failure(window, msg))
+    window.camera_manager.camera_started.connect(lambda: window.camera_display.update_camera_button_text(True))
+    window.camera_manager.camera_stopped.connect(lambda: window.camera_display.update_camera_button_text(False))
     window.camera_display.camera_toggle_requested.connect(window._toggle_camera)
     window.detection_controls.detection_toggle_requested.connect(window._toggle_detection)
     window.report_manager.pdf_generation_requested.connect(window._generate_pdf)

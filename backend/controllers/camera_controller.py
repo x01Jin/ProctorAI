@@ -44,6 +44,8 @@ def frame_update_loop(manager):
 class CameraManager(QObject):
     frame_ready = pyqtSignal(object)
     camera_start_failed = pyqtSignal(str)
+    camera_started = pyqtSignal()
+    camera_stopped = pyqtSignal()
  
     def __init__(self, main_window):
         super().__init__()
@@ -106,10 +108,8 @@ class CameraManager(QObject):
     def toggle_camera(self):
         self.camera_active = not self.camera_active
         if self.camera_active:
-            self.main_window.camera_display.update_camera_button_text(True)
             self.use_camera()
         else:
-            self.main_window.camera_display.update_camera_button_text(False)
             self.stop_camera()
 
     def _verify_camera_started(self):
@@ -149,9 +149,11 @@ class CameraManager(QObject):
                 self._release_resources()
                 logger.error("Failed to start camera process")
                 self.camera_start_failed.emit("Failed to start camera process. Please check your camera connection and try again.")
+                self.camera_stopped.emit()
                 return
             self.thread_pool_manager.run(frame_update_loop, self)
             logger.info("Camera process started successfully")
+            self.camera_started.emit()
         except Exception as e:
             logger.error(f"Error initializing camera: {str(e)}")
             self._release_resources()
@@ -187,6 +189,7 @@ class CameraManager(QObject):
 
     def stop_camera(self):
         self._release_resources()
+        self.camera_stopped.emit()
 
     def cleanup(self):
         logger.info("Cleaning up camera resources")
