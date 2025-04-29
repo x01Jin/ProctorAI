@@ -17,6 +17,7 @@ class AnimatedStateButton(QPushButton):
         self._active_gradient_colors = [QColor("#2ecc71"), QColor("#ffffff")]
         self._inactive_color = QColor("#e74c3c")
         self.setAutoFillBackground(True)
+        self.setStyleSheet("QPushButton:disabled { color: #bbbbbb; }")
 
     @pyqtProperty(float)
     def rotation_angle(self):
