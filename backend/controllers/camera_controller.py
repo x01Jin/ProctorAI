@@ -12,11 +12,10 @@ CAMERA_SLEEP_MS = 16
 logger = logging.getLogger("camera")
 
 CAMERA_BACKEND_MAP = {
-    "auto": None,
-    "dshow": cv2.CAP_DSHOW,
-    "msmf": cv2.CAP_MSMF
+    "DShow(MS Direct Show)": cv2.CAP_DSHOW,
+    "MSMF(MS Media Foundation)": cv2.CAP_MSMF
 }
- 
+
 def frame_update_loop(manager):
     import time
     frame_interval = 1.0 / 60.0

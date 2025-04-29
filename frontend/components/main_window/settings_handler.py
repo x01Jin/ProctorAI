@@ -10,6 +10,8 @@ def handle_settings_update(window):
     def do_update():
         if hasattr(window, "detection_manager") and window.detection_manager:
             window.detection_manager.toggle_detection(force_stop=True)
+        if hasattr(window, "camera_manager") and window.camera_manager and getattr(window.camera_manager, "camera_active", False):
+            window.camera_manager.stop_camera()
         roboflow_ok = window.app_state.reinitialize_roboflow()
         window._settings_update_result = {"roboflow_ok": roboflow_ok}
         if roboflow_ok:

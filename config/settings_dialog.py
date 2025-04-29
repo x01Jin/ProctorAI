@@ -71,6 +71,8 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         theme_group = self._create_theme_group()
         layout.addWidget(theme_group)
+        camera_group = self._create_camera_group()
+        layout.addWidget(camera_group)
         robo_group = self._create_roboflow_group()
         layout.addWidget(robo_group)
         db_group = self._create_database_group()
@@ -80,7 +82,7 @@ class SettingsDialog(QDialog):
         self.setLayout(layout)
     
     def _create_theme_group(self):
-        group = QGroupBox("Theme & Camera")
+        group = QGroupBox("Theme")
         layout = QVBoxLayout(group)
         layout.setSpacing(8)
         layout.setContentsMargins(15, 15, 15, 15)
@@ -90,11 +92,18 @@ class SettingsDialog(QDialog):
         theme_label = QLabel("Application Theme:")
         layout.addWidget(theme_label)
         layout.addWidget(self.theme_combo)
+        return group
+    
+    def _create_camera_group(self):
+        group = QGroupBox("Camera")
+        layout = QVBoxLayout(group)
+        layout.setSpacing(8)
+        layout.setContentsMargins(15, 15, 15, 15)
         self.camera_backend_combo = QComboBox()
-        self.camera_backend_combo.addItems(["auto", "dshow", "msmf"])
+        self.camera_backend_combo.addItems(["DShow(MS Direct Show)", "MSMF(MS Media Foundation)"])
         backend = get_setting("camera", "backend")
-        if backend not in ["auto", "dshow", "msmf"]:
-            backend = "auto"
+        if backend not in ["DShow(MS Direct Show)", "MSMF(MS Media Foundation)"]:
+            backend = "DShow(MS Direct Show)"
         self.camera_backend_combo.setCurrentText(backend)
         backend_label = QLabel("Camera Backend:")
         layout.addWidget(backend_label)
