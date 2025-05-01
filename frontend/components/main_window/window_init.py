@@ -19,6 +19,6 @@ def setup_window_layout(window):
     window.addDockWidget(Qt.DockWidgetArea.TopDockWidgetArea, window.detection_controls)
 
 def initialize_window(window):
-    window.setWindowTitle("ProctorAI v1.4.0b by CROISSANTS")
+    window.setWindowTitle("ProctorAI v1.4.1b by CROISSANTS")
     setup_window_geometry(window)
     setup_window_layout(window)
