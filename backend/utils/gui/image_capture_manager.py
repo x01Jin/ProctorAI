@@ -31,9 +31,38 @@ class ImageCaptureManager:
         if image.size == 0:
             ImageCaptureManager.logger.error(f"Invalid crop: x0={x0}, y0={y0}, x1={x1}, y1={y1}, image_shape={current_image.shape}")
             return
+        import time
+        formatted_time = time.strftime('%I:%M %p').lstrip('0')
+        watermark_text = f"Time captured: {formatted_time}"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        thickness = 1
+        margin = 8
+        text_size, baseline = cv2.getTextSize(watermark_text, font, font_scale, thickness)
+        text_x = margin
+        text_y = image.shape[0] - margin
+        cv2.putText(
+            image,
+            watermark_text,
+            (text_x, text_y),
+            font,
+            font_scale,
+            (0, 0, 0),
+            thickness + 2,
+            cv2.LINE_AA
+        )
+        cv2.putText(
+            image,
+            watermark_text,
+            (text_x, text_y),
+            font,
+            font_scale,
+            (255, 255, 255),
+            thickness,
+            cv2.LINE_AA
+        )
         random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
         image_filename = f"tempcaptures/untagged({random_id}).jpg"
         cv2.imwrite(image_filename, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
         from backend.utils.deduplication_utils import DetectionDeduplicator
-        import time
         DetectionDeduplicator._add_deadzone(detection, time.time())
