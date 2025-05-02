@@ -1,8 +1,11 @@
 from PyQt6.QtWidgets import QLabel, QInputDialog, QMenu, QMessageBox
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from pathlib import Path
 
 class ImageLabel(QLabel):
+    tag_changed = pyqtSignal()
+    image_deleted = pyqtSignal()
+
     def __init__(self, image_path, parent=None, filename_label=None):
         super().__init__(parent)
         self.image_path = str(image_path)
@@ -35,6 +38,7 @@ class ImageLabel(QLabel):
             path.unlink()
         if parent:
             parent.being_deleted.discard(self.image_path)
+        self.image_deleted.emit()
 
     def _add_tag(self):
         tag, ok = QInputDialog.getText(self, "Add Tag", "Enter tag:")
@@ -43,6 +47,11 @@ class ImageLabel(QLabel):
             self.setToolTip(tag)
             self.update()
             self._update_filename_with_tag()
+            self.tag_changed.emit()
+            if self.filename_label and hasattr(self.filename_label, "parent"):
+                parent = self.filename_label.parent()
+                if hasattr(parent, "on_image_update") and callable(parent.on_image_update):
+                    parent.on_image_update()
         elif ok and tag:
             QMessageBox.critical(self, "Invalid Tag", "The tag contains invalid characters.")
 
@@ -57,17 +66,20 @@ class ImageLabel(QLabel):
         path = Path(self.image_path)
         directory = path.parent
         ext = path.suffix
-        new_filename = f"{self.tag}{ext}"
+        filesystem_tag = self.tag.replace(' ', '_')
+        new_filename = f"{filesystem_tag}{ext}"
         new_filepath = directory / new_filename
         counter = 1
         while new_filepath.exists():
-            new_filename = f"{self.tag}_{counter}{ext}"
+            new_filename = f"{filesystem_tag}_{counter}{ext}"
             new_filepath = directory / new_filename
             counter += 1
         path.rename(new_filepath)
         self.image_path = str(new_filepath)
         if self.filename_label:
-            self.filename_label.setText(self.tag)
+            display_name = self.tag if len(self.tag) <= 15 else self.tag[:15] + "..."
+            self.filename_label.setText(display_name)
+            self.filename_label.setToolTip(self.tag)
             self._update_filename_label_width()
 
     def _update_filename_label_width(self):

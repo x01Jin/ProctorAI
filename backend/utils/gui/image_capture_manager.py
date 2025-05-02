@@ -34,7 +34,6 @@ class ImageCaptureManager:
         random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
         image_filename = f"tempcaptures/untagged({random_id}).jpg"
         cv2.imwrite(image_filename, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-        ImageCaptureManager.logger.info(f"Captured image saved to: {image_filename}")
         from backend.utils.deduplication_utils import DetectionDeduplicator
         import time
         DetectionDeduplicator._add_deadzone(detection, time.time())

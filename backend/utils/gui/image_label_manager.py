@@ -9,25 +9,40 @@ class ImageLabelManager:
     logger = logging.getLogger('report')
 
     @staticmethod
-    def add_image_label_to_layout(image_path, captures_layout, fixed_size=150):
+    def add_image_label_to_layout(image_path, captures_layout, group=None, is_latest=False, on_image_update=None, fixed_size=150):
         if not os.path.exists(image_path):
-            ImageLabelManager.logger.error(f"Image file not found: {image_path}")
             return
         container = QFrame()
         container.image_path = image_path
+
+        if group == "untagged":
+            if is_latest:
+                border = "3px solid gold"
+            else:
+                border = "2px solid #2196f3"
+        elif group == "tagged":
+            border = "2px solid #43a047"
+        else:
+            border = "1px solid #333333"
+
         container.setStyleSheet(
-            "QFrame {background-color: #1e1e1e; padding: 8px; border: 1px solid #333333; border-radius: 4px; margin: 4px;}"
+            f"QFrame {{background-color: #1e1e1e; padding: 8px; border: {border}; border-radius: 4px; margin: 4px;}}"
         )
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(5)
         _, filename = os.path.split(image_path)
         name, _ = os.path.splitext(filename)
-        filename_label = QLabel(name)
+        display_name = name if len(name) <= 15 else name[:15] + "..."
+        filename_label = QLabel(display_name)
         filename_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         filename_label.setStyleSheet("QLabel { color: #ffffff; }")
         filename_label.setWordWrap(False)
+        filename_label.setToolTip(name)
         image_label = ImageLabel(image_path, filename_label=filename_label)
+        if on_image_update:
+            image_label.tag_changed.connect(on_image_update)
+            image_label.image_deleted.connect(on_image_update)
         canvas = QPixmap(fixed_size, fixed_size)
         canvas.fill(Qt.GlobalColor.black)
         original = QPixmap(image_path)
@@ -45,14 +60,8 @@ class ImageLabelManager:
         image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         container_layout.addWidget(image_label)
         container_layout.addWidget(filename_label)
-        metrics = filename_label.fontMetrics()
-        text_width = metrics.horizontalAdvance(name)
-        max_width = captures_layout.parentWidget().width() * 0.8
-        if text_width > max_width:
-            elided_text = metrics.elidedText(name, Qt.TextElideMode.ElideRight, int(max_width))
-            filename_label.setText(elided_text)
         filename_label.adjustSize()
-        captures_layout.insertWidget(0, container, alignment=Qt.AlignmentFlag.AlignCenter)
+        captures_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignCenter)
 
     @staticmethod
     def remove_image_from_layout(image_path, captures_layout):

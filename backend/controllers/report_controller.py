@@ -7,6 +7,11 @@ from backend.utils.report import prompt_report_details
 
 logger = logging.getLogger("report")
 
+def format_display_name(filename):
+    name_without_extension = os.path.splitext(filename)[0]
+    display_name = name_without_extension.replace('_', ' ')
+    return display_name
+
 def get_report_details():
     return prompt_report_details()
 
@@ -49,8 +54,8 @@ def save_pdf_with_details(details):
             pdf.image(image_path, x=x, y=y, w=90, h=90)
             pdf.set_font("Arial", size=8)
             pdf.set_xy(x, y - 5)
-            filename_without_extension = os.path.splitext(filename)[0]
-            pdf.cell(90, 5, filename_without_extension, 0, 0, "C")
+            display_name = format_display_name(filename)
+            pdf.cell(90, 5, display_name, 0, 0, "C")
             image_count += 1
         pdf.output(pdf_filename)
         logger.info("PDF report saved: %s", pdf_filename)
