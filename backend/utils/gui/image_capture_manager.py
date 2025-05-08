@@ -41,7 +41,6 @@ class ImageCaptureManager:
     
     @staticmethod
     def capture_image(detection, current_image, window):
-        # Early returns for invalid conditions
         if detection['class'] != window.get_selected_capture_class():
             return
             
@@ -49,7 +48,6 @@ class ImageCaptureManager:
             ImageCaptureManager.logger.info(f"Skipped capture: detection in deadzone {detection}")
             return
         
-        # Calculate crop dimensions
         x_center, y_center = detection['x'], detection['y']
         display_width = window.camera_display.display_label.width()
         capture_size = int(display_width * 0.20 * 1.2)
@@ -64,7 +62,6 @@ class ImageCaptureManager:
             ImageCaptureManager.logger.error(f"Invalid crop: {x0},{y0},{x1},{y1}, shape={current_image.shape}")
             return
 
-        # Process and save image
         pil_image = ImageCaptureManager._cv2_to_pil(cropped_image)
         pil_image = ImageCaptureManager._add_watermark(pil_image)
         
@@ -72,5 +69,4 @@ class ImageCaptureManager:
         image_filename = f"tempcaptures/untagged({random_id}).jpg"
         pil_image.save(image_filename, quality=100, subsampling=0)
         
-        # Add to deadzone after successful capture
         DetectionDeduplicator._add_deadzone(detection, time.time())
