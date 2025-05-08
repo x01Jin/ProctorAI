@@ -20,3 +20,4 @@ config.ini
 appfeaturesdoc.md
 tests
 pytest.ini
+.VSCodeCounter
