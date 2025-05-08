@@ -12,8 +12,8 @@ CAMERA_SLEEP_MS = 16
 logger = logging.getLogger("camera")
 
 CAMERA_BACKEND_MAP = {
-    "DShow(MS Direct Show)": cv2.CAP_DSHOW,
-    "MSMF(MS Media Foundation)": cv2.CAP_MSMF
+    "DirectShow - Microsoft": "dshow",
+    "Media Foundation - Microsoft": "msmf"
 }
 
 def frame_update_loop(manager):
@@ -63,13 +63,17 @@ class CameraManager(QObject):
     def _get_camera_backend(self):
         backend = get_setting("camera", "backend")
         if backend not in CAMERA_BACKEND_MAP:
-            backend = "auto"
-        return backend
+            return "auto"
+        return CAMERA_BACKEND_MAP[backend]
 
     def _get_opencv_devices(self):
         devices = []
         backend = self._get_camera_backend()
-        backend_flag = CAMERA_BACKEND_MAP[backend]
+        backend_flag = None
+        if backend == "dshow":
+            backend_flag = cv2.CAP_DSHOW
+        elif backend == "msmf":
+            backend_flag = cv2.CAP_MSMF
         for i in range(5):
             if backend_flag is not None:
                 cap = cv2.VideoCapture(i, backend_flag)
