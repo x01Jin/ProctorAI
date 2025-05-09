@@ -16,6 +16,7 @@ class DialogBuilder:
     def build_widgets(self):
         widgets = {}
         widgets['proctor'] = TextInputWidget("Proctor's Name:")
+        widgets['proctor'].entry.setReadOnly(True)
         widgets['num_students'] = TextInputWidget(
             "Number of Students:",
             create_number_validator(MIN_STUDENTS, MAX_STUDENTS),
@@ -26,18 +27,18 @@ class DialogBuilder:
         widgets['room'] = RoomWidget()
         widgets['start_time'] = TimeWidget("Start Time:")
         widgets['end_time'] = TimeWidget("End Time:")
-        widgets['date'] = self._setup_date_widget()
+        widgets['date_label'], widgets['date'] = self._setup_date_widget()
         return widgets
 
     def _setup_date_widget(self):
-        self.layout.addWidget(QLabel("Exam Date:"))
+        label = QLabel("Exam Date:")
         date_widget = QDateEdit(calendarPopup=True)
         date_widget.setDate(QDate.currentDate())
-        return date_widget
+        return label, date_widget
 
     def add_widgets_to_layout(self, widgets):
-        for widget in widgets.values():
-            self.layout.addWidget(widget)
+        for key in ['proctor', 'num_students', 'block', 'subject', 'room', 'start_time', 'end_time', 'date_label', 'date']:
+            self.layout.addWidget(widgets[key])
 
     def setup_submit_button(self):
         submit_button = QPushButton("Submit")

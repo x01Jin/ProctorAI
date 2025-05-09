@@ -12,19 +12,19 @@ def format_display_name(filename):
     display_name = name_without_extension.replace('_', ' ')
     return display_name
 
-def get_report_details():
-    return prompt_report_details()
+def get_report_details(user_id, proctor_name):
+    return prompt_report_details(user_id, proctor_name)
 
 def save_pdf_with_details(details):
     if not details:
         return False
-    proctor, block, date, subject, room, start, end, num_students = details
+    user_id, proctor, block, date, subject, room, start, end, num_students = details
     try:
         app_state = ApplicationState.get_instance()
         db = app_state.database
         if db:
             db.insert_report_details(
-                app_state.settings, proctor, block, date, subject, room, start, end, num_students
+                app_state.settings, user_id, block, date, subject, room, start, end, num_students
             )
             logger.info("Inserted report details into database for block=%s, subject=%s, date=%s", block, subject, date)
         else:

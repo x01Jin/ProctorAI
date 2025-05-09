@@ -21,13 +21,15 @@ from .pdf_handler import generate_pdf
 from .settings_handler import handle_settings_update, cleanup_resources
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, user_id=None, proctor_name=None):
         super().__init__()
+        self.user_id = user_id
+        self.proctor_name = proctor_name
         self.app_state = ApplicationState.get_instance()
         settings_manager.load_settings()
         self.settings = settings_manager
         self.thread_pool_manager = ThreadPoolManager()
-        
+
         if not setup_base_components(self):
             return
         if not setup_model_components(self):

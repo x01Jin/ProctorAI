@@ -3,6 +3,7 @@ from typing import Tuple
 
 @dataclass
 class ReportDetails:
+    user_id: int
     proctor: str
     block: str
     date: str
@@ -14,8 +15,9 @@ class ReportDetails:
 
 class DetailsCollector:
     @staticmethod
-    def collect_details(widgets) -> ReportDetails:
+    def collect_details(widgets, user_id) -> ReportDetails:
         return ReportDetails(
+            user_id=user_id,
             proctor=widgets['proctor'].text(),
             block=widgets['block'].get_block_text(),
             date=widgets['date'].date().toString("yyyy-MM-dd"),
@@ -29,6 +31,7 @@ class DetailsCollector:
     @staticmethod
     def unpack_details(details: ReportDetails) -> Tuple:
         return (
+            details.user_id,
             details.proctor,
             details.block,
             details.date,
