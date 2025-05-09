@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QMainWindow, QMessageBox
 import config.settings_manager as settings_manager
 from backend.utils.thread_utils import ThreadPoolManager
 from backend.services.application_state import ApplicationState
+import backend.services.database_service as db_service
 from .window_init import initialize_window
 from .component_setup import setup_base_components, setup_model_components
 from .signal_handler import (
@@ -30,7 +31,9 @@ class MainWindow(QMainWindow):
         self.settings = settings_manager
         self.thread_pool_manager = ThreadPoolManager()
 
-        if not setup_base_components(self):
+        user = db_service.get_user_by_id(self.user_id)
+        email = user["email"] if user and "email" in user else ""
+        if not setup_base_components(self, self.proctor_name, email):
             return
         if not setup_model_components(self):
             return

@@ -8,11 +8,11 @@ from frontend.components.status_bar import StatusBarManager
 from frontend.components.toolbar import ToolbarManager
 from frontend.themes.theme_manager import ThemeManager
 
-def setup_base_components(window):
+def setup_base_components(window, proctor_name=None, email=None):
     window.camera_display = CameraDisplayDock("Camera and Display", window)
     window.report_manager = ReportManagerDock("Captured Images", window)
     window.detection_controls = DetectionControlsDock("Detection Controls", window)
-    window.status_bar = StatusBarManager(window)
+    window.status_bar = StatusBarManager(window, proctor_name, email)
     window.toolbar = ToolbarManager(window)
     window.theme_manager = ThemeManager(window)
     window.toolbar.settings_updated.connect(window._on_settings_updated)

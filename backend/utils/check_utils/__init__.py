@@ -18,7 +18,7 @@ def run_checks(log_display, on_complete):
             check_database(log_display, after_database)
 
     def after_database(database_ok):
-        log_display.log("All checks complete, starting application...", "info")
-        QTimer.singleShot(1000, lambda: on_complete(database_ok))
+        log_display.log("All checks complete, logging in...", "info")
+        QTimer.singleShot(500, lambda: on_complete(database_ok))
 
     check_config(log_display, after_config)
