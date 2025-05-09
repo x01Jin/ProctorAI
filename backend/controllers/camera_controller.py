@@ -12,8 +12,8 @@ CAMERA_SLEEP_MS = 16
 logger = logging.getLogger("camera")
 
 CAMERA_BACKEND_MAP = {
-    "DirectShow - Microsoft": "dshow",
-    "Media Foundation - Microsoft": "msmf"
+    "DirectShow - Microsoft (Windows legacy video capture, for better compatibility)": "dshow",
+    "Media Foundation - Microsoft (Modern Windows media framework, for newer high end devices)": "msmf",
 }
 
 def frame_update_loop(manager):

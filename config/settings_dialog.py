@@ -100,11 +100,11 @@ class SettingsDialog(QDialog):
         layout.setSpacing(8)
         layout.setContentsMargins(15, 15, 15, 15)
         self.camera_backend_combo = QComboBox()
-        backend_options = ["DirectShow - Microsoft", "Media Foundation - Microsoft"]
+        backend_options = ["DirectShow - Microsoft (Windows legacy video capture, for better compatibility)", "Media Foundation - Microsoft (Modern Windows media framework, for newer high end devices)"]
         self.camera_backend_combo.addItems(backend_options)
         backend = get_setting("camera", "backend")
         if backend not in backend_options:
-            backend = "DirectShow - Microsoft"
+            backend = "DirectShow - Microsoft (Windows legacy video capture, for better compatibility)"
         self.camera_backend_combo.setCurrentText(backend)
         backend_label = QLabel("Camera Backend:")
         layout.addWidget(backend_label)
