@@ -4,10 +4,13 @@ from .field_validator import FieldValidator
 from .details_collector import DetailsCollector
 
 class ReportDialog(QDialog):
-    def __init__(self):
+    def __init__(self, user_id, proctor_name):
         super().__init__()
+        self.user_id = user_id
+        self.proctor_name = proctor_name
         self.builder = DialogBuilder(self)
         self.widgets = self.builder.build_widgets()
+        self.widgets['proctor'].entry.setText(self.proctor_name)
         self.builder.add_widgets_to_layout(self.widgets)
         self.submit_button = self.builder.setup_submit_button()
         self._setup_validation()
@@ -60,11 +63,11 @@ class ReportDialog(QDialog):
             self.builder.show_error(time_result.error)
             return
 
-        self.details = DetailsCollector.collect_details(self.widgets)
+        self.details = DetailsCollector.collect_details(self.widgets, self.user_id)
         self.accept()
 
-def prompt_report_details():
-    dialog = ReportDialog()
+def prompt_report_details(user_id, proctor_name):
+    dialog = ReportDialog(user_id, proctor_name)
     if dialog.exec() and dialog.details:
         return DetailsCollector.unpack_details(dialog.details)
     return None

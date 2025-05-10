@@ -1,7 +1,14 @@
 from pathlib import Path
 import configparser
+import os
+import shutil
 
-SETTINGS_FILE = "config.ini"
+APP_NAME = "ProctorAI"
+CONFIG_DIR = Path(os.getenv('APPDATA')) / APP_NAME
+CONFIG_FILE = CONFIG_DIR / "config.ini"
+
+def ensure_config_directory():
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 REQUIRED_SETTINGS = {
     'roboflow': ['api_key', 'project', 'model_classes'],
     'database': ['host', 'user', 'database']
@@ -9,13 +16,18 @@ REQUIRED_SETTINGS = {
 
 _settings_data = {}
 
-def config_exists(settings_file=SETTINGS_FILE):
-    return Path(settings_file).exists()
+def config_exists():
+    old_config = Path("config.ini")
+    if old_config.exists():
+        ensure_config_directory()
+        shutil.copy2(old_config, CONFIG_FILE)
+        old_config.unlink()
+    return CONFIG_FILE.exists()
 
 
-def load_settings(settings_file=SETTINGS_FILE):
+def load_settings():
     config = configparser.ConfigParser()
-    config.read(settings_file)
+    config.read(CONFIG_FILE)
     settings = {}
     for section in config.sections():
         settings[section] = dict(config[section])
@@ -23,14 +35,15 @@ def load_settings(settings_file=SETTINGS_FILE):
     _settings_data = settings
     return settings
 
-def save_settings(settings_file=SETTINGS_FILE):
+def save_settings():
+    ensure_config_directory()
     config = configparser.ConfigParser()
     for section, values in _settings_data.items():
         if section not in config:
             config[section] = {}
         for key, value in values.items():
             config[section][key] = str(value)
-    with open(settings_file, 'w') as f:
+    with open(CONFIG_FILE, 'w') as f:
         config.write(f)
 
 def get_setting(category, key=None):

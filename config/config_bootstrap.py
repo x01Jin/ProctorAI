@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
-from config.settings_manager import config_exists, load_settings, SETTINGS_FILE
+from config.settings_manager import config_exists, load_settings, ensure_config_directory, CONFIG_FILE
 from config.settings_dialog import SettingsDialog
 from PyQt6.QtWidgets import QApplication
 import configparser
@@ -20,7 +20,8 @@ DEFAULT_SETTINGS = {
     }
 }
 
-def create_default_config(settings_file=SETTINGS_FILE):
+def create_default_config():
+    ensure_config_directory()
     config = configparser.ConfigParser()
     settings = DEFAULT_SETTINGS.copy()
     for section, values in settings.items():
@@ -28,7 +29,7 @@ def create_default_config(settings_file=SETTINGS_FILE):
             config[section] = {}
         for key, value in values.items():
             config[section][key] = str(value)
-    with open(settings_file, 'w') as f:
+    with open(CONFIG_FILE, 'w') as f:
         config.write(f)
     return settings
 

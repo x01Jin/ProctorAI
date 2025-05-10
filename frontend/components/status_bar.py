@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QStatusBar, QLabel
 from PyQt6.QtCore import QTimer
 
 class StatusBarManager:
-    def __init__(self, parent):
+    def __init__(self, parent, proctor_name=None, email=None):
         self.status_bar = QStatusBar()
         parent.setStatusBar(self.status_bar)
         self.connection_label = QLabel("●")
@@ -10,6 +10,12 @@ class StatusBarManager:
         self.status_bar.addWidget(self.connection_label)
         self.detected_objects_label = QLabel("Detected Objects: 0")
         self.status_bar.addWidget(self.detected_objects_label)
+        self.proctor_info_label = QLabel("")
+        if proctor_name and email:
+            self.proctor_info_label.setText(
+                f'Proctor: <b style="color:lime">{proctor_name}</b> | <b style="color:lime">{email}</b>'
+            )
+        self.status_bar.addPermanentWidget(self.proctor_info_label)
         self._blink_timer = QTimer()
         self._blink_timer.setInterval(500)
         self._blink_timer.timeout.connect(self._toggle_blink)

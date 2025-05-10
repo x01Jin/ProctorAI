@@ -6,7 +6,7 @@ from frontend.components.loading_dialog import LoadingDialog
 
 logger = logging.getLogger("report")
 
-def generate_pdf(window):
+def generate_pdf(window, user_id=None, proctor_name=None):
     try:
         if getattr(window.detection_manager, "detection_active", False):
             if not show_detection_pdf_warning(window):
@@ -14,7 +14,10 @@ def generate_pdf(window):
             def toggle_task():
                 window.detection_manager.toggle_detection(force_stop=True)
             LoadingDialog.show_loading(window, "Toggling detection...", toggle_task, logger_name="report")
-        details = get_report_details()
+        if user_id is None or proctor_name is None:
+            user_id = getattr(window, "user_id", None)
+            proctor_name = getattr(window, "proctor_name", None)
+        details = get_report_details(user_id, proctor_name)
         if not details:
             return
         def worker():
