@@ -14,7 +14,7 @@ class LoginWindow(QDialog):
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.layout.addWidget(self.info_label)
         self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Proctor Name")
+        self.username_input.setPlaceholderText("Username or Email")
         self.layout.addWidget(self.username_input)
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Password")
@@ -32,6 +32,8 @@ class LoginWindow(QDialog):
             QMessageBox.warning(self, "Login Failed", "Please enter both username and password.")
             return
         user = self.db_service.get_user_by_proctor_name(username)
+        if not user:
+            user = self.db_service.get_user_by_email(username)
         if not user or user.get("user_role") != "proctor":
             QMessageBox.warning(self, "Login Failed", "Invalid username or password.")
             return

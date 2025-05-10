@@ -99,6 +99,19 @@ def get_user_by_proctor_name(proctor_name):
             return cursor.fetchone()
     except Error:
         return None
+def get_user_by_email(email):
+    global _connection
+    if _connection is None or not _connection.is_connected():
+        return None
+    try:
+        with _connection.cursor(dictionary=True) as cursor:
+            cursor.execute(
+                "SELECT * FROM users WHERE email = %s AND user_role = 'proctor'",
+                (email,)
+            )
+            return cursor.fetchone()
+    except Error:
+        return None
 
 def get_user_by_id(user_id):
     global _connection
