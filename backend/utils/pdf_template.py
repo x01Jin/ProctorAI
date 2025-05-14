@@ -1,14 +1,52 @@
 import logging
+import os
 from fpdf import FPDF
+from PIL import Image
+import tempfile
 
 REPORT_DIR_NAME = "ProctorAI-Report"
+WATERMARK_PATH = os.path.join("assets", "watermark.jpg")
 
 class PDFReport(FPDF):
+    def __del__(self):
+        if hasattr(self, '_temp_watermark'):
+            try:
+                os.unlink(self._temp_watermark)
+            except Exception as e:
+                self.logger.error(f"Error deleting temporary watermark file: {e}")
+                
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger('report')
 
+    def prepare_transparent_watermark(self):
+        if not hasattr(self, '_temp_watermark'):
+            with Image.open(WATERMARK_PATH) as img:
+                img = img.convert('RGBA')
+                transparent = Image.new('RGBA', img.size, (255, 255, 255, 0))
+                blended = Image.blend(transparent, img, 0.50)
+                
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                blended.save(temp_file.name, 'PNG')
+                self._temp_watermark = temp_file.name
+                self._watermark_original = img.size
+    
+    def add_watermark(self):
+        self.prepare_transparent_watermark()
+        
+        page_width = self.w
+        target_width = page_width * 0.8
+        
+        scale = target_width / self._watermark_original[0]
+        target_height = self._watermark_original[1] * scale
+        
+        image_x = (page_width - target_width) / 2
+        image_y = (self.h - target_height) / 2
+        
+        self.image(self._temp_watermark, x=image_x, y=image_y, w=target_width)
+
     def header(self):
+        self.add_watermark()
         self.set_font("Arial", 'B', 20)
         self.cell(0, 5, "Proctor AI", ln=True, align='C')
         self.cell(0, 8, "Generated Report", ln=True, align='C')
