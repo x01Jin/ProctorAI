@@ -35,7 +35,7 @@ def _detection_process_entry(frame_queue: QueueType, result_queue: QueueType, st
 
 def _camera_loop(frame_queue: QueueType, stop_event: EventType, device_index: int):
     frame_interval = 1.0 / CAM_FRAMES
-    cap = cv2.VideoCapture(device_index)
+    cap = cv2.VideoCapture(device_index + cv2.CAP_DSHOW)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     last_frame_time = 0
