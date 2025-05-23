@@ -51,6 +51,4 @@ class ToolbarManager(QObject):
             app_state = ApplicationState.get_instance()
             if app_state.database:
                 app_state.database.connection = None
-                connected = app_state.database.connect(settings_manager)
-                app_state.update_connection_status(database=connected)
             self.settings_updated.emit()

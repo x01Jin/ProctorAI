@@ -1,4 +1,3 @@
-from PyQt6.QtWidgets import QMessageBox
 from frontend.components.loading_dialog import LoadingDialog
 import logging
 
@@ -13,35 +12,11 @@ def handle_settings_update(window):
             if hasattr(window, "detection_manager") and getattr(window.detection_manager, "detection_active", False):
                 window.detection_manager.toggle_detection(force_stop=True)
             window.camera_manager.stop_camera()
-        roboflow_ok = window.app_state.reinitialize_roboflow()
-        window._settings_update_result = {"roboflow_ok": roboflow_ok}
-        if roboflow_ok:
-            model_ok = setup_model(window)
-            window._settings_update_result["model_ok"] = model_ok
-        else:
-            window._settings_update_result["model_ok"] = False
-
-    def on_done():
-        result = getattr(window, "_settings_update_result", None)
-        if not result or not result.get("roboflow_ok"):
-            error_msg = window.app_state.roboflow.last_error or "Failed to initialize Roboflow model"
-            QMessageBox.critical(window, "Error", f"Model update failed: {error_msg}")
-            return
-        if not result.get("model_ok"):
-            QMessageBox.critical(window, "Error", "Failed to set up model components.")
-            return
-        QMessageBox.information(
-            window,
-            "Success",
-            "Roboflow model successfully changed and is ready to use"
-        )
 
     LoadingDialog.show_loading(
         window,
         "Re-initializing settings...",
         do_update,
-        on_done=on_done,
-        logger_name="roboflow"
     )
 
 def setup_model(window):

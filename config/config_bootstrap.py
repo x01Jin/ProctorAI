@@ -6,18 +6,7 @@ import configparser
 
 DEFAULT_SETTINGS = {
     'theme': {'theme': 'dark'},
-    'roboflow': {
-        'api_key': 'REQUIRED',
-        'project': 'REQUIRED',
-        'model_version': '1',
-        'model_classes': 'REQUIRED'
-    },
-    'database': {
-        'host': 'REQUIRED',
-        'user': 'REQUIRED',
-        'password': '',
-        'database': 'REQUIRED'
-    }
+    'camera': {'backend': 'DirectShow - Microsoft (Windows legacy video capture, for better compatibility)'}
 }
 
 def create_default_config():
@@ -40,10 +29,7 @@ class ConfigConfirmDialog(QDialog):
         self.setModal(True)
         layout = QVBoxLayout()
         message = (
-            "ProctorAI requires initial configuration:\n"
-            "• Roboflow API credentials\n"
-            "• Model class definitions\n"
-            "• Database connection settings\n\n"
+            "ProctorAI requires initial configuration.\n"
             "Application cannot start without these settings."
         )
         label = QLabel(message)

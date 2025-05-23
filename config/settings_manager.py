@@ -7,14 +7,10 @@ APP_NAME = "ProctorAI"
 CONFIG_DIR = Path(os.getenv('APPDATA')) / APP_NAME
 CONFIG_FILE = CONFIG_DIR / "config.ini"
 
+_settings_data = {}
+
 def ensure_config_directory():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-REQUIRED_SETTINGS = {
-    'roboflow': ['api_key', 'project', 'model_classes'],
-    'database': ['host', 'user', 'database']
-}
-
-_settings_data = {}
 
 def config_exists():
     old_config = Path("config.ini")
@@ -23,7 +19,6 @@ def config_exists():
         shutil.copy2(old_config, CONFIG_FILE)
         old_config.unlink()
     return CONFIG_FILE.exists()
-
 
 def load_settings():
     config = configparser.ConfigParser()
@@ -59,11 +54,3 @@ def update_setting(category, key, value):
             _settings_data[category] = {}
         _settings_data[category][key] = value
     save_settings()
-
-def validate_settings():
-    for section, fields in REQUIRED_SETTINGS.items():
-        section_data = get_setting(section)
-        for field in fields:
-            value = section_data.get(field, '').strip()
-            if not value or value == 'REQUIRED':
-                raise ValueError(f"Required setting missing: {section}.{field}")
