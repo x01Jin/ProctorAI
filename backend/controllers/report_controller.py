@@ -24,7 +24,7 @@ def save_pdf_with_details(details):
         db = app_state.database
         if db:
             db.insert_report_details(
-                app_state.settings, user_id, block, date, subject, room, start, end, num_students
+                user_id, block, date, subject, room, start, end, num_students
             )
             logger.info("Inserted report details into database for block=%s, subject=%s, date=%s", block, subject, date)
         else:
