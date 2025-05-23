@@ -6,11 +6,9 @@ from PyQt6.QtCore import pyqtSignal
 from frontend.themes.theme_manager import ThemeManager
 from .settings_manager import get_setting, update_setting, save_settings
 
-def save_settings_dialog(theme_combo, setup_mode, settings_updated, parent, camera_backend_combo=None):
+def save_settings_dialog(theme_combo, setup_mode, settings_updated, parent):
     try:
         update_setting("theme", "theme", theme_combo.currentText())
-        if camera_backend_combo:
-            update_setting("camera", "backend", camera_backend_combo.currentText())
         save_settings()
         if setup_mode:
             QMessageBox.information(
@@ -47,9 +45,7 @@ class SettingsDialog(QDialog):
         theme_group = self._create_theme_group()
         layout.addWidget(theme_group)
         
-        camera_group = self._create_camera_group()
-        layout.addWidget(camera_group)
-        
+
         button_layout = self._create_button_layout()
         layout.addLayout(button_layout)
         
@@ -66,26 +62,6 @@ class SettingsDialog(QDialog):
         theme_label = QLabel("Application Theme:")
         layout.addWidget(theme_label)
         layout.addWidget(self.theme_combo)
-        return group
-    
-    def _create_camera_group(self):
-        group = QGroupBox("Camera")
-        layout = QVBoxLayout(group)
-        layout.setSpacing(8)
-        layout.setContentsMargins(15, 15, 15, 15)
-        self.camera_backend_combo = QComboBox()
-        backend_options = [
-            "DirectShow - Microsoft (Windows legacy video capture, for better compatibility)",
-            "Media Foundation - Microsoft (Modern Windows media framework, for newer high end devices)"
-        ]
-        self.camera_backend_combo.addItems(backend_options)
-        backend = get_setting("camera", "backend")
-        if backend not in backend_options:
-            backend = backend_options[0]
-        self.camera_backend_combo.setCurrentText(backend)
-        backend_label = QLabel("Camera Backend:")
-        layout.addWidget(backend_label)
-        layout.addWidget(self.camera_backend_combo)
         return group
     
     def _create_button_layout(self):
@@ -110,8 +86,7 @@ class SettingsDialog(QDialog):
             self.theme_combo,
             self.setup_mode,
             self.settings_updated,
-            self,
-            self.camera_backend_combo
+            self
         )
         if result:
             self.accept()

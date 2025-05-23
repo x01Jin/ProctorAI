@@ -5,8 +5,7 @@ from PyQt6.QtWidgets import QApplication
 import configparser
 
 DEFAULT_SETTINGS = {
-    'theme': {'theme': 'dark'},
-    'camera': {'backend': 'DirectShow - Microsoft (Windows legacy video capture, for better compatibility)'}
+    'theme': {'theme': 'dark'}
 }
 
 def create_default_config():
