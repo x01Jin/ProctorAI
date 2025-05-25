@@ -2,30 +2,41 @@ import mysql.connector
 from mysql.connector import Error
 import logging
 
-DB_REQUIRED_FIELDS = ['host', 'user', 'database']
 DB_LOGGER = logging.getLogger('database')
 
 _connection = None
 _last_error = None
 
-def get_db_config(settings):
-    db_settings = settings.get_setting('database')
-    if not db_settings:
-        set_last_error("Database settings not found")
-        DB_LOGGER.error("Database settings not found")
-        return None
-    for field in DB_REQUIRED_FIELDS:
-        if not db_settings.get(field):
-            error_msg = f"Missing required database setting: {field}"
-            set_last_error(error_msg)
-            DB_LOGGER.error(error_msg)
-            return None
+def get_db_config():
     return {
-        'host': db_settings['host'],
-        'user': db_settings['user'],
-        'password': db_settings.get('password', ''),
-        'database': db_settings['database']
+        'host': 'localhost',
+        'user': 'root',
+        'password': '',
+        'database': 'proctorai'
     }
+
+def fetch_roboflow_settings():
+    ensure_connection()
+    if _connection is None:
+        DB_LOGGER.error("Failed to fetch Roboflow settings: No database connection")
+        return None
+    try:
+        with _connection.cursor(dictionary=True) as cursor:
+            cursor.execute(
+                "SELECT api_key, project, model_version, model_classes FROM modelapi ORDER BY updated_at DESC LIMIT 1"
+            )
+            settings = cursor.fetchone()
+            if not settings:
+                error_msg = "No Roboflow settings found in database"
+                set_last_error(error_msg)
+                DB_LOGGER.error(error_msg)
+                return None
+            return settings
+    except Error as e:
+        error_msg = str(e)
+        set_last_error(error_msg)
+        DB_LOGGER.error(f"Error fetching Roboflow settings: {error_msg}")
+        return None
 
 def set_last_error(msg):
     global _last_error
@@ -34,17 +45,15 @@ def set_last_error(msg):
 def get_last_error():
     return _last_error
 
-def connect(settings):
+def connect():
     global _connection
     try:
-        db_config = get_db_config(settings)
-        if not db_config:
-            return False
+        db_config = get_db_config()
         _connection = mysql.connector.connect(**db_config)
         if _connection.is_connected():
             db_info = _connection.get_server_info()
             session_id = _connection.connection_id
-            DB_LOGGER.info(f"Successfully connected to MySQL database (Server: {db_info}, Session ID: {session_id})")
+            DB_LOGGER.info(f"Connected to MySQL (Server: {db_info}, Session ID: {session_id})")
             return True
     except Error as e:
         error_msg = str(e)
@@ -53,42 +62,40 @@ def connect(settings):
         _connection = None
     return False
 
-def ensure_connection(settings):
+def ensure_connection():
     global _connection
     if _connection is None or not _connection.is_connected():
         DB_LOGGER.info("Attempting to reconnect...")
-        connect(settings)
+        connect()
 
-def insert_report_details(settings, user_id, block, date, subject, room, start, end, num_students):
-    global _connection
-    ensure_connection(settings)
+def insert_report_details(user_id, block, date, subject, room, start, end, num_students):
+    ensure_connection()
     if _connection is None:
         error_msg = "No database connection"
         set_last_error(error_msg)
         DB_LOGGER.error(f"Failed to insert report details: {error_msg}")
-        return
+        return False
     try:
         session_id = _connection.connection_id
         DB_LOGGER.info(f"Beginning report details insert (Session ID: {session_id})")
         with _connection.cursor() as cursor:
-            query = (
+            cursor.execute(
                 "INSERT INTO reportlog (user_id, num_students, block, subject, room, start, end, date) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (user_id, int(num_students), block, subject, room, start, end, date)
             )
-            try:
-                num_students_int = int(num_students)
-            except ValueError:
-                raise ValueError("Number of students must be a valid integer")
-            values = (user_id, num_students_int, block, subject, room, start, end, date)
-            cursor.execute(query, values)
             _connection.commit()
             DB_LOGGER.info(f"Report details inserted successfully (Session ID: {session_id})")
-    except Error:
-        set_last_error("Error inserting report details")
+            return True
+    except (Error, ValueError) as e:
+        error_msg = str(e)
+        set_last_error(error_msg)
+        DB_LOGGER.error(f"Failed to insert report details: {error_msg}")
+        return False
 
 def get_user_by_proctor_name(proctor_name):
-    global _connection
-    if _connection is None or not _connection.is_connected():
+    ensure_connection()
+    if _connection is None:
         return None
     try:
         with _connection.cursor(dictionary=True) as cursor:
@@ -97,11 +104,13 @@ def get_user_by_proctor_name(proctor_name):
                 (proctor_name,)
             )
             return cursor.fetchone()
-    except Error:
+    except Error as e:
+        DB_LOGGER.error(f"Error getting user by proctor name: {str(e)}")
         return None
+
 def get_user_by_email(email):
-    global _connection
-    if _connection is None or not _connection.is_connected():
+    ensure_connection()
+    if _connection is None:
         return None
     try:
         with _connection.cursor(dictionary=True) as cursor:
@@ -110,12 +119,13 @@ def get_user_by_email(email):
                 (email,)
             )
             return cursor.fetchone()
-    except Error:
+    except Error as e:
+        DB_LOGGER.error(f"Error getting user by email: {str(e)}")
         return None
 
 def get_user_by_id(user_id):
-    global _connection
-    if _connection is None or not _connection.is_connected():
+    ensure_connection()
+    if _connection is None:
         return None
     try:
         with _connection.cursor(dictionary=True) as cursor:
@@ -124,12 +134,13 @@ def get_user_by_id(user_id):
                 (user_id,)
             )
             return cursor.fetchone()
-    except Error:
+    except Error as e:
+        DB_LOGGER.error(f"Error getting user by ID: {str(e)}")
         return None
 
 def update_user_profile(user_id, proctor_name, email, password_hash):
-    global _connection
-    if _connection is None or not _connection.is_connected():
+    ensure_connection()
+    if _connection is None:
         return False
     try:
         with _connection.cursor(dictionary=True) as cursor:
@@ -137,18 +148,16 @@ def update_user_profile(user_id, proctor_name, email, password_hash):
                 "SELECT id FROM users WHERE (proctor_name = %s OR email = %s) AND id != %s",
                 (proctor_name, email, user_id)
             )
-            duplicate = cursor.fetchone()
-            if duplicate:
+            if cursor.fetchone():
                 set_last_error("Proctor name or email already exists")
                 DB_LOGGER.error("Proctor name or email already exists")
                 return False
-        with _connection.cursor() as cursor:
             cursor.execute(
                 "UPDATE users SET proctor_name = %s, email = %s, password = %s WHERE id = %s",
                 (proctor_name, email, password_hash, user_id)
             )
             _connection.commit()
             return True
-    except Error:
-        DB_LOGGER.error("Error updating user profile")
+    except Error as e:
+        DB_LOGGER.error(f"Error updating user profile: {str(e)}")
         return False

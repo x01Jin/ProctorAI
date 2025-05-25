@@ -23,7 +23,7 @@ class StatusBarManager:
         self._blink_state = True
 
     def update_detections_count(self, count):
-        self.detected_objects_label.setText(f"Detected Objects: {count}")
+        self.detected_objects_label.setText(f"Detected Students: {count}")
 
     def set_detection_status(self, status):
         if status == "connected":

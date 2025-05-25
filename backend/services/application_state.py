@@ -25,7 +25,7 @@ class ApplicationState:
 
     def initialize_database(self, settings_manager) -> None:
         self.settings = settings_manager
-        self.db_connected = database_service.connect(settings_manager)
+        self.db_connected = database_service.connect()
 
     @property
     def database(self):

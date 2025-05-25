@@ -1,5 +1,9 @@
-from multiprocessing import get_context, Queue, Event, Value
+from multiprocessing import get_context
+from multiprocessing.synchronize import Event as EventType
+from multiprocessing.queues import Queue as QueueType
+from multiprocessing.sharedctypes import Value as ValueType
 from queue import Empty, Full
+from typing import Dict, Any
 import cv2
 import logging
 import time
@@ -11,36 +15,27 @@ CAM_WIDTH = 1280
 CAM_HEIGHT = 720
 CAM_FRAMES = 30.0
 
-def start_camera_process(frame_queue: Queue, stop_event: Event, camera_index: int, backend: str = "auto"):
+def start_camera_process(frame_queue: QueueType, stop_event: EventType, device_index: int):
     ctx = get_context('spawn')
-    process = ctx.Process(target=_camera_process_entry, args=(frame_queue, stop_event, camera_index, backend))
+    process = ctx.Process(target=_camera_process_entry, args=(frame_queue, stop_event, device_index))
     process.daemon = True
     return process
 
-def start_detection_process(frame_queue: Queue, result_queue: Queue, stop_event: Event, model_config: dict, confidence_value: Value, connection_state: Value):
+def start_detection_process(frame_queue: QueueType, result_queue: QueueType, stop_event: EventType, model_config: Dict[str, Any], confidence_value: ValueType, connection_state: ValueType):
     ctx = get_context('spawn')
     process = ctx.Process(target=_detection_process_entry, args=(frame_queue, result_queue, stop_event, model_config, confidence_value, connection_state))
     process.daemon = True
     return process
 
-def _camera_process_entry(frame_queue: Queue, stop_event: Event, camera_index: int, backend: str = "auto"):
-    _camera_loop(frame_queue, stop_event, camera_index, backend)
+def _camera_process_entry(frame_queue: QueueType, stop_event: EventType, device_index: int):
+    _camera_loop(frame_queue, stop_event, device_index)
 
-def _detection_process_entry(frame_queue: Queue, result_queue: Queue, stop_event: Event, model_config: dict, confidence_value: Value, connection_state: Value):
+def _detection_process_entry(frame_queue: QueueType, result_queue: QueueType, stop_event: EventType, model_config: Dict[str, Any], confidence_value: ValueType, connection_state: ValueType):
     _detection_loop(frame_queue, result_queue, stop_event, model_config, confidence_value, connection_state)
 
-def _camera_loop(frame_queue: Queue, stop_event: Event, camera_index: int, backend: str = "auto"):
+def _camera_loop(frame_queue: QueueType, stop_event: EventType, device_index: int):
     frame_interval = 1.0 / CAM_FRAMES
-    backend_map = {
-        "auto": None,
-        "dshow": cv2.CAP_DSHOW,
-        "msmf": cv2.CAP_MSMF
-    }
-    backend_flag = backend_map.get(backend, None)
-    if backend_flag is not None:
-        cap = cv2.VideoCapture(camera_index, backend_flag)
-    else:
-        cap = cv2.VideoCapture(camera_index)
+    cap = cv2.VideoCapture(device_index + cv2.CAP_DSHOW)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
     last_frame_time = 0
@@ -67,7 +62,7 @@ def _camera_loop(frame_queue: Queue, stop_event: Event, camera_index: int, backe
             
     cap.release()
 
-def _detection_loop(frame_queue: Queue, result_queue: Queue, stop_event: Event, model_config: dict, confidence_value: Value, connection_state: Value):
+def _detection_loop(frame_queue: QueueType, result_queue: QueueType, stop_event: EventType, model_config: Dict[str, Any], confidence_value: ValueType, connection_state: ValueType):
     import time
     model = model_config.get('model')
     frame_skip = 2
@@ -90,7 +85,7 @@ def _detection_loop(frame_queue: Queue, result_queue: Queue, stop_event: Event, 
             connection_state.value = 0
             
             try:
-                results = model.predict(frame_rgb, confidence=confidence, overlap=30).json()
+                results = model.predict(frame_rgb, confidence=confidence, overlap=0.5).json()
                 predictions = results.get('predictions', [])
                 if predictions:
                     scale_x = frame.shape[1] / target_width
@@ -121,7 +116,7 @@ def _detection_loop(frame_queue: Queue, result_queue: Queue, stop_event: Event, 
             connection_state.value = 1
             time.sleep(0.1)
 
-def clean_up_process(process, stop_event: Event):
+def clean_up_process(process: Any, stop_event: EventType):
     if not process:
         return
         

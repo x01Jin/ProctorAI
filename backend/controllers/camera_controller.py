@@ -1,51 +1,46 @@
 from PyQt6.QtCore import QObject, pyqtSignal
 from pygrabber.dshow_graph import FilterGraph
-import cv2
 import logging
 from backend.utils.thread_utils import ThreadPoolManager
 from backend.utils.mp_utils import start_camera_process, clean_up_process
 from multiprocessing import Queue, Event
 from queue import Empty
-from config.settings_manager import get_setting
- 
-CAMERA_SLEEP_MS = 16
-logger = logging.getLogger("camera")
 
-CAMERA_BACKEND_MAP = {
-    "DirectShow - Microsoft (Windows legacy video capture, for better compatibility)": "dshow",
-    "Media Foundation - Microsoft (Modern Windows media framework, for newer high end devices)": "msmf",
-}
+FRAME_INTERVAL = 1.0 / 60.0
+QUEUE_TIMEOUT = 0.1
+QUEUE_SIZE = 10
+
+logger = logging.getLogger("camera")
 
 def frame_update_loop(manager):
     import time
-    frame_interval = 1.0 / 60.0
     last_frame_time = 0
     logger.info("Frame update thread starting")
-     
+
     while manager.camera_active:
         current_time = time.time()
         time_since_last = current_time - last_frame_time
-         
-        if time_since_last < frame_interval:
-            time.sleep(max(0.001, frame_interval - time_since_last))
+
+        if time_since_last < FRAME_INTERVAL:
+            time.sleep(max(0.001, FRAME_INTERVAL - time_since_last))
             continue
-             
+
         try:
-            frame = manager.frame_queue.get(timeout=0.1)
+            frame = manager.frame_queue.get(timeout=QUEUE_TIMEOUT)
             manager.current_image = frame
             manager.frame_ready.emit(frame)
             last_frame_time = time.time()
         except Empty:
             time.sleep(0.01)
-             
+
     logger.info("Frame update thread stopped")
- 
+
 class CameraManager(QObject):
     frame_ready = pyqtSignal(object)
     camera_start_failed = pyqtSignal(str)
     camera_started = pyqtSignal()
     camera_stopped = pyqtSignal()
- 
+
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
@@ -58,52 +53,21 @@ class CameraManager(QObject):
         self.camera_process = None
         self.frame_queue = None
         self.stop_event = None
-        self.camera_backend = self._get_camera_backend()
-
-    def _get_camera_backend(self):
-        backend = get_setting("camera", "backend")
-        if backend not in CAMERA_BACKEND_MAP:
-            return "auto"
-        return CAMERA_BACKEND_MAP[backend]
-
-    def _get_opencv_devices(self):
-        devices = []
-        backend = self._get_camera_backend()
-        backend_flag = None
-        if backend == "dshow":
-            backend_flag = cv2.CAP_DSHOW
-        elif backend == "msmf":
-            backend_flag = cv2.CAP_MSMF
-        for i in range(5):
-            if backend_flag is not None:
-                cap = cv2.VideoCapture(i, backend_flag)
-            else:
-                cap = cv2.VideoCapture(i)
-            if cap.isOpened():
-                devices.append(f"Camera {i}")
-                cap.release()
-                logger.info(f"Found camera at index {i} with backend {backend}")
-        return devices
 
     def list_cameras(self):
         try:
-            logger.debug("Attempting to list cameras using FilterGraph")
             graph = FilterGraph()
             devices = graph.get_input_devices()
             if not devices:
-                logger.warning("No devices found using FilterGraph, falling back to OpenCV")
-                devices = self._get_opencv_devices()
+                devices = ["No cameras found"]
+                logger.error("No cameras detected on the system")
+            else:
+                logger.info(f"Found {len(devices)} camera(s): {devices}")
+            self.main_window.camera_display.populate_camera_list(devices)
+            return devices
         except Exception as e:
-            logger.error(f"Failed to initialize FilterGraph: {str(e)}")
-            logger.info("Attempting fallback to OpenCV camera detection")
-            devices = self._get_opencv_devices()
-        if not devices:
-            devices = ["No cameras found"]
-            logger.error("No cameras detected on the system")
-        else:
-            logger.info(f"Found {len(devices)} camera(s): {devices}")
-        self.main_window.camera_display.populate_camera_list(devices)
-        return devices
+            logger.error(f"Failed to list cameras: {e}")
+            return ["No cameras found"]
 
     def on_camera_selected(self, index):
         self.selected_camera = self.camera_devices[index]
@@ -119,70 +83,67 @@ class CameraManager(QObject):
         import time
         start_time = time.time()
         timeout = 5.0
-        
         while time.time() - start_time < timeout:
             if not self.camera_process.is_alive():
                 return False
             try:
-                frame = self.frame_queue.get(timeout=0.1)
+                frame = self.frame_queue.get(timeout=QUEUE_TIMEOUT)
                 if frame is not None:
                     self.frame_queue.put(frame)
                     return True
             except Empty:
                 time.sleep(0.1)
         return False
-        
+
     def use_camera(self):
         try:
             if self.selected_camera == "No cameras found":
                 logger.error("Cannot start camera - no cameras available")
                 return
-            if self.selected_camera.startswith("Camera "):
-                camera_index = int(self.selected_camera.split(" ")[1])
-            else:
-                camera_index = self.camera_devices.index(self.selected_camera)
-            backend = self._get_camera_backend()
-            logger.info(f"Initializing camera: {self.selected_camera} (index: {camera_index}) with backend {backend}")
-            optimal_queue_size = 10
-            self.frame_queue = Queue(maxsize=optimal_queue_size)
+
+            device_index = self.camera_devices.index(self.selected_camera)
+            logger.info(f"Initializing camera: {self.selected_camera} (index: {device_index})")
+            
+            self.frame_queue = Queue(maxsize=QUEUE_SIZE)
             self.stop_event = Event()
-            self.camera_process = start_camera_process(self.frame_queue, self.stop_event, camera_index, backend)
+            self.camera_process = start_camera_process(self.frame_queue, self.stop_event, device_index)
             self.camera_process.start()
+            
             if not self._verify_camera_started():
                 self._release_resources()
                 logger.error("Failed to start camera process")
                 self.camera_start_failed.emit("Failed to start camera process. Please check your camera connection and try again.")
                 self.camera_stopped.emit()
                 return
+                
             self.thread_pool_manager.run(frame_update_loop, self)
             logger.info("Camera process started successfully")
             self.camera_started.emit()
         except Exception as e:
-            logger.error(f"Error initializing camera: {str(e)}")
+            logger.error(f"Error initializing camera: {e}")
             self._release_resources()
 
     def _release_resources(self):
         logger.info("Releasing camera resources")
         self.camera_active = False
-        
         import time
         time.sleep(0.1)
-        
+
         if self.camera_process:
             clean_up_process(self.camera_process, self.stop_event)
             if self.frame_queue:
                 while not self.frame_queue.empty():
                     try:
                         self.frame_queue.get_nowait()
-                    except Exception:
+                    except Empty:
                         break
             self.camera_process = None
             self.stop_event = None
             self.frame_queue = None
-        
+
         if hasattr(self, 'thread_pool_manager'):
             self.thread_pool_manager.cleanup()
-        
+
         try:
             if hasattr(self, "main_window") and self.main_window and hasattr(self.main_window, "camera_display"):
                 self.main_window.camera_display.display_label.clear()
