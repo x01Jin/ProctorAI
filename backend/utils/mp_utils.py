@@ -85,7 +85,7 @@ def _detection_loop(frame_queue: QueueType, result_queue: QueueType, stop_event:
             connection_state.value = 0
             
             try:
-                results = model.predict(frame_rgb, confidence=confidence, overlap=30).json()
+                results = model.predict(frame_rgb, confidence=confidence, overlap=0.5).json()
                 predictions = results.get('predictions', [])
                 if predictions:
                     scale_x = frame.shape[1] / target_width

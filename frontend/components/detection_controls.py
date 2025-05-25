@@ -46,10 +46,10 @@ class DetectionControlsDock(QDockWidget):
         self.detection_button.setEnabled(False)
         layout.addWidget(self.detection_button)
 
-        self.confidence_label = QLabel("10%")
+        self.confidence_label = QLabel("30%")
         self.confidence_slider = QSlider(Qt.Orientation.Horizontal)
         self.confidence_slider.setRange(0, 100)
-        self.confidence_slider.setValue(10)
+        self.confidence_slider.setValue(30)
         self.confidence_slider.setMinimumWidth(self.confidence_slider.sizeHint().width() * 3)
         self.confidence_slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.confidence_slider.valueChanged.connect(self._update_confidence_label)
