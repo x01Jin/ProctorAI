@@ -28,10 +28,21 @@ def draw_bounding_box(image, detection, window):
         x_center, y_center = detection['x'], detection['y']
         display_width = window.camera_display.display_label.width()
         box_size = int(display_width * 0.20)
-        x0 = int(x_center - box_size / 2)
-        y0 = int(y_center - box_size / 2)
-        x1 = int(x_center + box_size / 2)
-        y1 = int(y_center + box_size / 2)
+        box_height = detection.get('height', 0)
+        if box_height > box_size:
+            y0 = int(y_center - box_height / 2)
+            y1 = y0 + box_size
+            x0 = int(x_center - box_size / 2)
+            x1 = x0 + box_size
+        else:
+            x0 = int(x_center - box_size / 2)
+            y0 = int(y_center - box_size / 2)
+            x1 = int(x_center + box_size / 2)
+            y1 = int(y_center + box_size / 2)
+        x0 = max(0, x0)
+        y0 = max(0, y0)
+        x1 = min(image.shape[1], x1)
+        y1 = min(image.shape[0], y1)
         class_name = detection['class']
         confidence = detection['confidence']
         color_index = hash(class_name) % 10
